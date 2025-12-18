@@ -1,0 +1,1 @@
+function o(){const e=window;return e.pywebview&&e.pywebview.api?e.pywebview.api:null}const a=new Proxy({},{get(e,t){return async i=>{const n=o();if(!n||typeof n[t]!="function")throw new Error(`pywebview api method not available: ${t}`);const w=n[t];return i==null?await w():await w(i)}}});export{a as pywebviewApi};

@@ -1,0 +1,18 @@
+[report]
+# Output both HTML and XML coverage reports
+out = ["Html", "Xml"]
+
+[html]
+# HTML output configuration
+output-dir = "target/tarpaulin/html/"
+
+[run]
+# Run configuration
+timeout = 120
+follow-exec = true
+post-args = "--ignore-panics --ignore-tests --run-types tests"
+exclude-files = ["*/target/*", "*/tests/*"]
+
+# Coverage thresholds
+fail-under = 95.0
+verbose = true

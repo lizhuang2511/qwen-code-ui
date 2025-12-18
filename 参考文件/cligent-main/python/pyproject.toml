@@ -1,0 +1,58 @@
+[project]
+name = "cligent"
+version = "0.1.7"
+description = "Unified SDK for CLI agents (Claude Code, Gemini CLI, Qwen Coder)"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Jinglei Ren", email = "jinglei@merico.ai" }
+]
+requires-python = ">=3.8"
+dependencies = [
+    "PyYAML>=6.0",
+]
+keywords = ["cli", "agent", "orchestrator", "ai", "claude", "gemini", "qwen", "task-execution"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Homepage = "https://github.com/sublang-ai/cligent"
+Issues = "https://github.com/sublang-ai/cligent/issues"
+Repository = "https://github.com/sublang-ai/cligent.git"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+    "types-PyYAML>=6.0",
+]
+
+[project.scripts]
+cligent = "cligent.cli:main"
+
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/__init__.py" = "cligent/__init__.py"
+"src/cligent.py" = "cligent/cligent.py"
+"src/core" = "cligent/core"
+"src/agents" = "cligent/agents"
+"src/cli.py" = "cligent/cli.py"
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src", "pyproject.toml", "README.md"]
