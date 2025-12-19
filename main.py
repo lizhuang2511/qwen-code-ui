@@ -80,7 +80,7 @@ if __name__ == "__main__":
     entry = get_entry()
     backend_process = start_backend()
     
-    window = webview.create_window("App", entry, js_api=Api())
+    window = webview.create_window("QWENCODE", entry, js_api=Api())
     dev = os.environ.get("FRONTEND_DEV", "")
 
     def on_closing():

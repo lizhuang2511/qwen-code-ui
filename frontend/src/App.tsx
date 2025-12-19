@@ -477,6 +477,7 @@ function RootLayoutContent() {
     () => ({
       conversations,
       activeConversation,
+      setActiveConversation,
       currentConversation,
       input,
       isCliInstalled,

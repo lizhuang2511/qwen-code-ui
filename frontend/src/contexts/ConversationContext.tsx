@@ -8,6 +8,7 @@ import { SessionProgressPayload } from "../types/session";
 export interface ConversationContextType {
   conversations: Conversation[];
   activeConversation: string | null;
+  setActiveConversation: (id: string | null) => void;
   currentConversation: Conversation | undefined;
   input: string;
   isCliInstalled: boolean | null;

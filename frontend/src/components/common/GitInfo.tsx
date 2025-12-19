@@ -9,14 +9,12 @@ interface GitInfoProps {
   directory: string;
   className?: string;
   compact?: boolean;
-  onFolderClick?: () => void;
 }
 
 export function GitInfo({
   directory,
   className = "",
   compact = false,
-  onFolderClick,
 }: GitInfoProps) {
   const [gitInfo, setGitInfo] = useState<GitInfoType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,18 +94,6 @@ export function GitInfo({
       <Card className={`border-l-4 border-l-gray-300 ${className}`}>
         <CardContent className="p-3">
           <div className="flex items-center gap-2 text-sm text-gray-500">
-            <button
-              onClick={onFolderClick}
-              className={
-                onFolderClick
-                  ? "cursor-pointer hover:text-foreground transition-colors p-1 -ml-1 rounded hover:bg-muted/50"
-                  : "pointer-events-none"
-              }
-              type="button"
-              title="Open file browser"
-            >
-              <FolderOpen className="h-4 w-4" />
-            </button>
             <div className="flex flex-col gap-1">
               <span className="font-medium">Not a git repository</span>
               <span className="text-xs opacity-75 truncate" title={directory}>
@@ -186,18 +172,7 @@ export function GitInfo({
         <div className="flex flex-col gap-2">
           {/* Directory */}
           <div className="flex items-center gap-2 text-sm">
-            <button
-              onClick={onFolderClick}
-              className={
-                onFolderClick
-                  ? "cursor-pointer hover:text-foreground transition-colors p-1 -ml-1 rounded hover:bg-muted/50"
-                  : "pointer-events-none"
-              }
-              type="button"
-              title="Open file browser"
-            >
-              <FolderOpen className="h-4 w-4 text-gray-500" />
-            </button>
+            <FolderOpen className="h-4 w-4 text-gray-500" />
             <span
               className="font-medium truncate"
               title={gitInfo.current_directory}

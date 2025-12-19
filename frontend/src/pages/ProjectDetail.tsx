@@ -1,5 +1,5 @@
 import React from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useOutletContext } from "react-router-dom";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { api } from "../lib/api";
@@ -23,13 +23,6 @@ import {
   DialogTrigger,
   DialogClose,
 } from "../components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "../components/ui/sheet";
-import { DirectoryPanel } from "../components/common/DirectoryPanel";
 
 type Discussion = {
   id: string;
@@ -46,7 +39,10 @@ export default function ProjectDetailPage() {
   const { t } = useTranslation();
   const { id: projectId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { startNewConversation, loadConversationFromHistory } =
+  const { setWorkingDirectory } = useOutletContext<{
+    setWorkingDirectory: (path: string) => void;
+  }>();
+  const { startNewConversation, loadConversationFromHistory, setActiveConversation } =
     useConversation();
   const { selectedBackend } = useBackend();
   const backendText = getBackendText(selectedBackend);
@@ -62,7 +58,6 @@ export default function ProjectDetailPage() {
     string | null
   >(null);
   const { progress, startListeningForSession } = useSessionProgress();
-  const [isFileBrowserOpen, setIsFileBrowserOpen] = React.useState(false);
 
   // Debug logging
   React.useEffect(() => {
@@ -71,6 +66,15 @@ export default function ProjectDetailPage() {
       isInProgress: !!progress,
     });
   }, [progress]);
+
+  // Sync working directory and clear active conversation when project data loads
+  React.useEffect(() => {
+    if (projectData?.metadata?.path) {
+      console.log("📂 [ProjectDetail] Setting working directory:", projectData.metadata.path);
+      setActiveConversation(null);
+      setWorkingDirectory(projectData.metadata.path);
+    }
+  }, [projectData, setActiveConversation, setWorkingDirectory]);
 
   const fetchDiscussions = React.useCallback(async () => {
     if (!projectId) return;
@@ -258,7 +262,6 @@ export default function ProjectDetailPage() {
             <div className="mt-4">
               <GitInfo
                 directory={projectData.metadata.path}
-                onFolderClick={() => setIsFileBrowserOpen(true)}
               />
             </div>
           )}
@@ -388,21 +391,6 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       </div>
-      <Sheet open={isFileBrowserOpen} onOpenChange={setIsFileBrowserOpen}>
-        <SheetContent side="right" className="w-[400px] sm:w-[540px] p-0 flex flex-col h-full">
-          <SheetHeader className="p-4 border-b flex-shrink-0">
-            <SheetTitle>{t("directoryPanel.title")}</SheetTitle>
-          </SheetHeader>
-          {projectData && (
-            <div className="flex-1 min-h-0 overflow-hidden relative">
-              <DirectoryPanel
-                workingDirectory={projectData.metadata.path}
-                className="h-full border-0 w-full"
-              />
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }
