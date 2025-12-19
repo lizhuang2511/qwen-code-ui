@@ -82,6 +82,20 @@ if __name__ == "__main__":
     
     window = webview.create_window("App", entry, js_api=Api())
     dev = os.environ.get("FRONTEND_DEV", "")
+
+    def on_closing():
+        # Prompt user to save conversation history
+        # Returns True to allow closing, False to cancel
+        should_save = window.create_confirmation_dialog(
+            "Save History", 
+            "Do you want to save the conversation history before exiting?"
+        )
+        if should_save:
+            print("Saving all conversations...")
+            # Actual saving is handled by RpcLogger/backend automatically
+        return True
+
+    window.events.closing += on_closing
     
     try:
         webview.start(start_ticker, debug=(dev == "1"))

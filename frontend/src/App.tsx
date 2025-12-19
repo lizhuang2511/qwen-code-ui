@@ -54,6 +54,8 @@ function RootLayoutContent() {
   const location = useLocation();
   const navigate = useNavigate();
   const isHomePage = location.pathname === "/";
+  // Check if we are on the project detail page
+  const isProjectDetailPage = /^\/projects\/[^/]+$/.test(location.pathname);
 
   const [selectedModel, setSelectedModel] =
     useState<string>("gemini-2.5-flash");
@@ -405,12 +407,12 @@ function RootLayoutContent() {
     setDirectoryPanelOpen((prev) => !prev);
   }, []);
 
-  // Auto-close directory panel when active conversation ends
+  // Auto-close directory panel when active conversation ends, unless we are on project detail page
   useEffect(() => {
-    if (!activeConversation && directoryPanelOpen) {
+    if (!activeConversation && !isProjectDetailPage && directoryPanelOpen) {
       setDirectoryPanelOpen(false);
     }
-  }, [activeConversation, directoryPanelOpen]);
+  }, [activeConversation, isProjectDetailPage, directoryPanelOpen]);
 
   const handleContinueConversation = useCallback(
     async (conversationToContinue: Conversation) => {
@@ -531,7 +533,10 @@ function RootLayoutContent() {
             style={{
               gridTemplateRows: "auto 1fr",
               gridTemplateColumns:
-                directoryPanelOpen && activeConversation ? "1fr 20rem" : "1fr",
+                directoryPanelOpen &&
+                (activeConversation || isProjectDetailPage)
+                  ? "1fr 20rem"
+                  : "1fr",
             }}
           >
             {/* Header */}
@@ -540,6 +545,9 @@ function RootLayoutContent() {
                 onDirectoryPanelToggle={toggleDirectoryPanel}
                 isDirectoryPanelOpen={directoryPanelOpen}
                 hasActiveConversation={!!activeConversation}
+                showDirectoryButton={
+                  !!activeConversation || isProjectDetailPage
+                }
                 onReturnToDashboard={() => {
                   setActiveConversation(null);
                   navigate("/projects");
@@ -550,7 +558,7 @@ function RootLayoutContent() {
 
             {/* Main content column */}
             <div className="row-start-2 col-start-1 flex flex-col min-w-0 min-h-0">
-              <Outlet context={{ workingDirectory }} />
+              <Outlet context={{ workingDirectory, setWorkingDirectory }} />
               {currentConversationWithStatus && isHomePage && (
                 <>
                   {console.log(
@@ -580,19 +588,20 @@ function RootLayoutContent() {
             </div>
 
             {/* Right directory panel */}
-            {directoryPanelOpen && activeConversation && (
-              <div className="row-start-2 col-start-2 border-l min-h-0">
-                <DirectoryPanel
-                  workingDirectory={workingDirectory}
-                  onDirectoryChange={(path) => {
-                    console.log("📁 [App] Directory changed to:", path);
-                  }}
-                  onMentionInsert={handleMentionInsert}
-                  onNewConversation={handleNewConversationFromDirectory}
-                  className="w-[20rem] h-full"
-                />
-              </div>
-            )}
+            {directoryPanelOpen &&
+              (activeConversation || isProjectDetailPage) && (
+                <div className="row-start-2 col-start-2 border-l min-h-0">
+                  <DirectoryPanel
+                    workingDirectory={workingDirectory}
+                    onDirectoryChange={(path) => {
+                      console.log("📁 [App] Directory changed to:", path);
+                    }}
+                    onMentionInsert={handleMentionInsert}
+                    onNewConversation={handleNewConversationFromDirectory}
+                    className="w-[20rem] h-full"
+                  />
+                </div>
+              )}
           </div>
         </SidebarInset>
       </AppSidebar>

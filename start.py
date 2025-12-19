@@ -30,12 +30,14 @@ def get_entry_html() -> str:
         if os.path.exists(p):
             return p
     print("index.html not found. Please run: pnpm -C frontend build")
-    return paths[0]
+    raise RuntimeError("index.html not found. Please run: pnpm -C frontend build")
 
 
 def start_backend():
     print("Starting backend server on port 1858...")
+    # Use array for command to avoid shell injection and better handling
     cmd = [sys.executable, "-m", "uvicorn", "server.main:app", "--port", "1858", "--host", "127.0.0.1"]
+    # No dev mode flags for start.py
     return subprocess.Popen(cmd, cwd=BASE_DIR)
 
 
@@ -74,5 +76,19 @@ if __name__ == "__main__":
     atexit.register(cleanup, backend_process)
     
     window = webview.create_window("App", entry, js_api=Api())
+    
+    def on_closing():
+        # Prompt user to save conversation history
+        # Returns True to allow closing, False to cancel
+        should_save = window.create_confirmation_dialog(
+            "Save History", 
+            "Do you want to save the conversation history before exiting?"
+        )
+        if should_save:
+            print("Saving all conversations...")
+            # Actual saving is handled by RpcLogger/backend automatically
+        return True
+
+    window.events.closing += on_closing
     
     webview.start(start_ticker, debug=False)

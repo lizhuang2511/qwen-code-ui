@@ -588,6 +588,13 @@ export function DirectoryPanel({
                     <FolderPlus className="mr-2 h-4 w-4" />
                     {t("directoryPanel.newFolder", "New Folder")}
                   </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    onClick={() => handlePaste(node.full_path)}
+                  >
+                    <Clipboard className="mr-2 h-4 w-4" />
+                    {t("directoryPanel.paste", "Paste")}
+                  </ContextMenuItem>
                 </>
               )}
               <ContextMenuItem

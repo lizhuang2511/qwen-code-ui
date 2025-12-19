@@ -11,6 +11,7 @@ interface AppHeaderProps {
   onDirectoryPanelToggle?: () => void;
   isDirectoryPanelOpen?: boolean;
   hasActiveConversation?: boolean;
+  showDirectoryButton?: boolean;
   onReturnToDashboard?: () => void;
   onOpenSettings?: () => void;
 }
@@ -19,10 +20,16 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onDirectoryPanelToggle,
   isDirectoryPanelOpen = false,
   hasActiveConversation = false,
+  showDirectoryButton,
   onReturnToDashboard,
   onOpenSettings,
 }) => {
   const { t } = useTranslation();
+
+  const shouldShowDirectoryButton =
+    showDirectoryButton !== undefined
+      ? showDirectoryButton
+      : hasActiveConversation;
 
   const handleLogoClick = () => {
     if (hasActiveConversation && onReturnToDashboard) {
@@ -75,12 +82,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 <SettingsIcon className="h-4 w-4" />
               </Button>
             )}
-            {onDirectoryPanelToggle && hasActiveConversation && (
+            {onDirectoryPanelToggle && shouldShowDirectoryButton && (
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={onDirectoryPanelToggle}
                 className={`${isDirectoryPanelOpen ? "bg-muted" : ""}`}
+                title={t("directoryPanel.title", "Files")}
               >
                 <FolderTree className="h-4 w-4" />
               </Button>
