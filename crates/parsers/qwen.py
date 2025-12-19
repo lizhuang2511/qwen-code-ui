@@ -91,6 +91,7 @@ def _parse_single(text: str) -> Dict:
                 
                 # Expose specific update types to session.py
                 if update_type == "tool_call_update":
+                    # Return the full data structure so session.py can extract toolCallId from params.update
                     return {"status": "tool_call_update", "content": data, "metadata": {"source": "jsonl"}, "raw": text}
                 
                 if update_type == "agent_message_chunk":

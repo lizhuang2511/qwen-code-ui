@@ -31,6 +31,7 @@ export const useToolCallConfirmation = ({
       }
 
       try {
+        console.log("前端: 用户点击允许，准备发送请求");
         await api.send_tool_call_confirmation_response({
           sessionId: confirmationRequest.sessionId,
           requestId: confirmationRequest.requestId,

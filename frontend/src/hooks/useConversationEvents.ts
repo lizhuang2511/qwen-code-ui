@@ -456,6 +456,7 @@ export const useConversationEvents = (
               );
               return;
             }
+            console.log("前端: 收到后端工具调用更新:", update);
             if (update.sessionUpdate === "tool_call") {
               // Handle tool call start
               updateConversation(conversationId, (conv, lastMsg) => {

@@ -3,6 +3,7 @@ import subprocess
 import shutil
 import os
 import time
+import json
 from typing import Dict, Optional, List
 import events
 from cli_runner import build_client, build_command, resolve_executable, STREAM_LIMIT_BYTES, LINE_LIMIT_BYTES
@@ -99,10 +100,12 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                     if status == "tool_call_update":
                         data = parsed.get("content") or {}
                         params = data.get("params") or {}
-                        tool_call_id = params.get("toolCallId")
-                        tool_status = params.get("status")
+                        update = params.get("update") or {}
+                        tool_call_id = update.get("toolCallId")
+                        tool_status = update.get("status")
                         
                         print(f"[SESSION] Processing tool_call_update: id={tool_call_id} status={tool_status}")
+                        print(f"[SESSION-RAW-UPDATE] {ln}") # Debug full raw update
 
                         # Cleanup pending permissions if tool call is done
                         if tool_status in ["completed", "failed"] and tool_call_id:
@@ -111,16 +114,21 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                                 print(f"[SESSION] Cleaned up pending permission for finished tool {tool_call_id}")
                                 
                         # Forward event to frontend to ensure UI updates
+                        print(f"[SESSION] 后端: 已发送工具调用更新到前端: toolCallId={tool_call_id} status={tool_status}")
                         events.emit(f"acp-session-update-{session_id}", {
                             "sessionUpdate": "tool_call_update",
                             "toolCallId": tool_call_id,
                             "status": tool_status,
-                            "result": params.get("result")
+                            "result": update.get("result")
                         })
                         
                         # If failed, ensure we signal turn end if not already signaled
                         if tool_status == "failed":
                              print(f"[SESSION] Tool failed, emitting turn finished for {session_id}")
+                             result = update.get("result")
+                             content_err = update.get("content")
+                             print(f"[SESSION] 后端: 工具调用失败详情(result): {json.dumps(result, ensure_ascii=False)}")
+                             print(f"[SESSION] 后端: 工具调用失败内容(content): {json.dumps(content_err, ensure_ascii=False)}")
                              events.emit(f"ai-turn-finished-{session_id}", {})
                         continue
 
@@ -165,6 +173,7 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
             s = _sessions.get(session_id, {})
             s["last_error_at"] = now
             _sessions[session_id] = s
+            print(f"[SESSION-STDERR] {ln}")
             events.emit(f"cli-io-{session_id}", {"type": "output", "data": ln})
             if total >= STREAM_LIMIT_BYTES:
                 events.emit(f"cli-io-{session_id}", {"type": "output", "data": "[limit] stderr truncated"})
@@ -239,6 +248,19 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
         events.emit("process-status-changed", get_process_statuses())
         print(f"[SESSION] {session_id} error=invalid_working_directory path={wd}")
         return
+
+    # Permission check
+    abs_wd = os.path.abspath(wd)
+    print(f"[SESSION] 检查工作目录权限: {abs_wd}")
+    try:
+        test_file = os.path.join(abs_wd, ".perm_check")
+        with open(test_file, "w") as f:
+            f.write("ok")
+        os.remove(test_file)
+        print(f"[SESSION] 权限检查通过: 后端进程拥有写入权限")
+    except Exception as e:
+        print(f"[SESSION] 权限检查失败: 后端进程无法写入工作目录! Error: {e}")
+        print(f"[SESSION] 建议: 请尝试以管理员身份运行")
 
     backend_name = (backend or "").lower()
 
@@ -419,6 +441,7 @@ def kill_process(conversation_id: str) -> None:
 
 def handle_permission_response(session_id: str, tool_call_id: str, outcome: str) -> None:
     print(f"[SESSION] Handling permission response: id={tool_call_id} outcome={outcome}")
+    print(f"[SESSION] 后端: 收到权限响应: id={tool_call_id} outcome={outcome}")
     s = _sessions.get(session_id)
     if not s:
         print(f"[SESSION] Session {session_id} not found. Available: {list(_sessions.keys())}")
@@ -460,27 +483,37 @@ def handle_permission_response(session_id: str, tool_call_id: str, outcome: str)
     if proc and hasattr(proc, "send_response"):
          is_approved = outcome.startswith("proceed") or outcome.startswith("allow")
          print(f"[SESSION] Sending response to proc: approved={is_approved}")
+         print(f"[SESSION] 后端: 开始处理权限响应, 准备发送到适配器: req_id={req_id}")
          
          if is_approved:
-             # Construct ACP PermissionResult - flattened (PermissionOutcome)
+             # Construct ACP PermissionResult - nested based on Rust source
+             # PermissionResult { outcome: PermissionOutcome }
+             # PermissionOutcome::Selected { optionId: ... } -> { "outcome": "selected", "optionId": ... }
              result = {
-                 "outcome": "selected",
-                 "optionId": outcome
+                 "outcome": {
+                     "outcome": "selected",
+                     "optionId": outcome
+                 }
              }
              proc.send_response(req_id, result)
+             print(f"[SESSION] 后端: 已完成发送响应到适配器 (result={json.dumps(result)})")
          else:
-              # For rejection, we can also send a result with "cancelled" or "selected" + reject option
-              # Based on Rust: PermissionOutcome::Selected { optionId: "reject_..." } OR Cancelled
-              # The frontend sends "reject_once" or "reject_always" as outcome string
+              # For rejection
               if outcome.startswith("reject"):
                    result = {
-                       "outcome": "selected",
-                       "optionId": outcome
+                       "outcome": {
+                           "outcome": "selected",
+                           "optionId": outcome
+                       }
                    }
                    proc.send_response(req_id, result)
+                   print(f"[SESSION] 后端: 已完成发送响应到适配器 (result={json.dumps(result)})")
               else:
-                   # Cancelled case
+                   # Cancelled case - PermissionOutcome::Cancelled -> { "outcome": "cancelled" }
                    result = {
-                       "outcome": "cancelled"
+                       "outcome": {
+                           "outcome": "cancelled"
+                       }
                    }
                    proc.send_response(req_id, result)
+                   print(f"[SESSION] 后端: 已完成发送响应到适配器 (result={json.dumps(result)})")

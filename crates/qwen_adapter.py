@@ -43,25 +43,27 @@ class QwenProcess:
         cmd = [self.executable, "--experimental-acp", "--no-telemetry"]
         if self.model:
             cmd.extend(["--model", self.model])
+
+        # Fix for Windows .cmd/.bat execution
+        if os.name == "nt" and (self.executable.lower().endswith(".cmd") or self.executable.lower().endswith(".bat")):
+            cmd = ["cmd.exe", "/c"] + cmd
         
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
         
         print(f"[QwenAdapter] Starting persistent process: {cmd}")
         print(f"[QwenAdapter] Process CWD: {self.cwd}")
+        print(f"[QwenAdapter] Full launch info: cmd={cmd}, cwd={os.path.abspath(self.cwd)}")
         
         # We use Popen without try-except as requested.
         # Assuming environment is sanity checked by caller or above check.
+        # Use binary mode to avoid Windows OSError [Errno 22]
         self.process = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1,
             env=env,
-            encoding='utf-8',
-            errors='replace',
             cwd=self.cwd
         )
         self.pid = self.process.pid
@@ -85,7 +87,8 @@ class QwenProcess:
         json_req = json.dumps(req)
         if self.process and self.process.stdin:
             print(f"[QwenAdapter] Sending: {json_req[:200]}...")
-            self.process.stdin.write(json_req + "\r\n")
+            data = (json_req + "\n").encode("utf-8")
+            self.process.stdin.write(data)
             self.process.stdin.flush()
         return self.request_id
 
@@ -103,7 +106,8 @@ class QwenProcess:
         json_resp = json.dumps(resp)
         if self.process and self.process.stdin:
             print(f"[QwenAdapter] Sending response: {json_resp[:200]}...")
-            self.process.stdin.write(json_resp + "\r\n")
+            data = (json_resp + "\n").encode("utf-8")
+            self.process.stdin.write(data)
             self.process.stdin.flush()
             print(f"[QwenAdapter] Response flushed to stdin")
         else:
@@ -111,7 +115,9 @@ class QwenProcess:
 
     def _read_line_from_stdout(self) -> Optional[str]:
         if self.process and self.process.stdout:
-            return self.process.stdout.readline()
+            line_bytes = self.process.stdout.readline()
+            if line_bytes:
+                return line_bytes.decode("utf-8", errors="replace")
         return None
 
     def _perform_handshake(self) -> bool:
@@ -162,10 +168,11 @@ class QwenProcess:
     def _read_loop(self):
         print("[QwenAdapter] Read loop started")
         while self._running and self.process and self.process.stdout:
-            line = self.process.stdout.readline()
-            if not line:
+            line_bytes = self.process.stdout.readline()
+            if not line_bytes:
                 print("[QwenAdapter] Read loop: EOF received")
                 break
+            line = line_bytes.decode("utf-8", errors="replace")
             # Log raw line for debugging
             print(f"[QwenAdapter] STDOUT: {line[:200].strip()}")
             # Forward raw line to queue for session.py to handle (parsing, emitting events)
@@ -174,9 +181,10 @@ class QwenProcess:
     def _stderr_loop(self):
         print("[QwenAdapter] Stderr loop started")
         while self._running and self.process and self.process.stderr:
-            line = self.process.stderr.readline()
-            if not line:
+            line_bytes = self.process.stderr.readline()
+            if not line_bytes:
                 break
+            line = line_bytes.decode("utf-8", errors="replace")
             self.stderr_queue.put(line)
 
     class Stdin:
