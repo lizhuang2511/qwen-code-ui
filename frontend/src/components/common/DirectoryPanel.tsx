@@ -11,6 +11,7 @@ import {
   Eye,
   ExternalLink,
   Clipboard,
+  Copy,
   Trash2,
   FolderPlus,
   Move,
@@ -94,7 +95,7 @@ export function DirectoryPanel({
   const [moveTarget, setMoveTarget] = useState("");
 
   const [internalClipboard, setInternalClipboard] = useState<{
-    type: "cut";
+    type: "cut" | "copy";
     path: string;
     name: string;
   } | null>(null);
@@ -306,23 +307,37 @@ export function DirectoryPanel({
   // Handle Paste
   const handlePaste = useCallback(async (targetDir: string = workingDirectory) => {
     try {
-      // 1. Check internal clipboard first (for Cut operations)
-      if (internalClipboard && internalClipboard.type === "cut") {
+      // 1. Check internal clipboard first (for Cut/Copy operations)
+      if (internalClipboard) {
         const sourcePath = internalClipboard.path;
         const fileName = internalClipboard.name;
         // Simple join, assuming forward slashes or consistent handling
         const targetPath = `${targetDir.replace(/\\/g, "/")}/${fileName}`;
         
-        // Prevent moving to self
-        if (sourcePath === targetPath) {
-          setInternalClipboard(null);
-          return;
-        }
+        if (internalClipboard.type === "cut") {
+          // Prevent moving to self
+          if (sourcePath === targetPath) {
+            setInternalClipboard(null);
+            return;
+          }
 
-        await api.move_path({ oldPath: sourcePath, newPath: targetPath });
-        setInternalClipboard(null);
-        refreshDirectory();
-        toast.success(t("directoryPanel.moved", "Item moved successfully"));
+          await api.move_path({ oldPath: sourcePath, newPath: targetPath });
+          setInternalClipboard(null);
+          refreshDirectory();
+          toast.success(t("directoryPanel.moved", "Item moved successfully"));
+        } else if (internalClipboard.type === "copy") {
+          // Prevent copying to self
+          if (sourcePath === targetPath) {
+            toast.info(t("directoryPanel.copyToSelf", "Cannot copy to the same location"));
+            setInternalClipboard(null);
+            return;
+          }
+
+          await api.copy_files({ paths: [sourcePath], target: targetDir });
+          // Don't clear clipboard for copy to allow multiple pastes
+          refreshDirectory();
+          toast.success(t("directoryPanel.copied", "Item copied successfully"));
+        }
         return;
       }
 
@@ -453,7 +468,7 @@ export function DirectoryPanel({
         return path.replace(/[/\\][^/\\]+$/, "");
       };
 
-      const isCut = internalClipboard?.path === node.full_path;
+      const isCut = internalClipboard?.type === "cut" && internalClipboard.path === node.full_path;
 
       return (
         <div key={node.full_path}>
@@ -597,6 +612,19 @@ export function DirectoryPanel({
                   </ContextMenuItem>
                 </>
               )}
+              <ContextMenuItem
+                onClick={() => {
+                  setInternalClipboard({
+                    type: "copy",
+                    path: node.full_path,
+                    name: node.name,
+                  });
+                  toast.success(t("directoryPanel.copyToClipboard", "Copied to internal clipboard"));
+                }}
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                {t("directoryPanel.copy", "Copy")}
+              </ContextMenuItem>
               <ContextMenuItem
                 onClick={() => {
                   setInternalClipboard({
