@@ -3,12 +3,19 @@ import os
 import subprocess
 import shutil
 import shlex
+import time
 import events
 import filesystem
 import search
 import projects
 import session
 import webview
+try:
+    import win32clipboard
+    import win32con
+    HAS_WIN32 = True
+except ImportError:
+    HAS_WIN32 = False
 
 class Api:
     def check_cli_installed(self) -> bool:
@@ -210,3 +217,62 @@ class Api:
         if wins:
             for w in wins:
                 w.destroy()
+
+    def open_with_default_app(self, params: Dict[str, Any]) -> None:
+        path = params.get("path", "")
+        if os.path.exists(path):
+            if os.name == 'nt':
+                os.startfile(path)
+            elif os.name == 'posix':
+                subprocess.call(('open', path))
+            else:
+                subprocess.call(('xdg-open', path))
+
+    def copy_files(self, params: Dict[str, Any]) -> List[str]:
+        return filesystem.copy_files(params.get("paths", []), params.get("target", ""))
+
+    def get_clipboard_content(self) -> Dict[str, Any]:
+        result = {"type": "empty", "content": None}
+        
+        if not HAS_WIN32:
+            return result
+
+        win32clipboard.OpenClipboard()
+        
+        # Check for file drop list (CF_HDROP)
+        if win32clipboard.IsClipboardFormatAvailable(win32con.CF_HDROP):
+            data = win32clipboard.GetClipboardData(win32con.CF_HDROP)
+            if data:
+                result = {"type": "files", "content": list(data)}
+        
+        # Check for text (CF_UNICODETEXT)
+        elif win32clipboard.IsClipboardFormatAvailable(win32con.CF_UNICODETEXT):
+            text = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
+            if text:
+                text = text.strip()
+                # Remove surrounding quotes if present (common when copying paths)
+                clean_text = text
+                if len(text) >= 2 and text.startswith('"') and text.endswith('"'):
+                    clean_text = text[1:-1]
+                elif len(text) >= 2 and text.startswith("'") and text.endswith("'"):
+                    clean_text = text[1:-1]
+                    
+                # Check if text is a valid path
+                if os.path.exists(clean_text):
+                    # Treat as file/folder path
+                    result = {"type": "files", "content": [clean_text]}
+                else:
+                    result = {"type": "text", "content": text}
+        
+        win32clipboard.CloseClipboard()
+        
+        return result
+
+    def create_directory(self, params: Dict[str, Any]) -> bool:
+        return filesystem.create_directory(params.get("path", ""))
+
+    def delete_path(self, params: Dict[str, Any]) -> bool:
+        return filesystem.delete_path(params.get("path", ""))
+
+    def move_path(self, params: Dict[str, Any]) -> bool:
+        return filesystem.rename_path(params.get("oldPath", ""), params.get("newPath", ""))

@@ -1,0 +1,34 @@
+{
+  "id": "1766113754212",
+  "title": "你好",
+  "started_at_iso": "2025-12-19T03:09:14.287247Z",
+  "messages": [
+    {
+      "sender": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "你好"
+        }
+      ]
+    },
+    {
+      "sender": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "新建文件计算10+5"
+        }
+      ]
+    },
+    {
+      "sender": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "继续"
+        }
+      ]
+    }
+  ]
+}

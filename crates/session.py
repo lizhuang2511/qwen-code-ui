@@ -4,13 +4,70 @@ import shutil
 import os
 import time
 import json
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
+from pathlib import Path
+from datetime import datetime
 import events
 from cli_runner import build_client, build_command, resolve_executable, STREAM_LIMIT_BYTES, LINE_LIMIT_BYTES
 from parsers import parse_qwen_line
 from qwen_adapter import QwenProcess
 
+BASE_DIR = Path(__file__).resolve().parents[1]
+DATA_DIR = BASE_DIR / "data"
+PROJECTS_DIR = DATA_DIR / "projects"
+# Default project ID for single-project mode
+DEFAULT_PROJECT_ID = "default"
+
 _sessions: Dict[str, Dict] = {}
+
+class RpcLogger:
+    def __init__(self, session_id: str, project_id: str = DEFAULT_PROJECT_ID):
+        self.session_id = session_id
+        self.project_id = project_id
+        self.log_path = self._get_log_path()
+        self._ensure_dir()
+
+    def _get_log_path(self) -> Path:
+        # Use timestamp-based filename like Rust project: rpc-log-<timestamp>.log
+        # But we need to persist the SAME file for the session duration.
+        # We store the filename in the session state or generate a deterministic one?
+        # Actually, start_session generates a new session. We can use session_id if it's timestamp based,
+        # or generate a timestamp here.
+        # Ideally, session_id IS unique.
+        # The Rust project uses rpc-log-<timestamp>.log.
+        # We will use rpc-log-<session_id>.log if session_id is a timestamp, or just <session_id>.log.
+        # To match Rust exactly: rpc-log-<timestamp>.log
+        # We'll assume session_id MIGHT be a timestamp or UUID.
+        # Let's just use session_id for now to ensure we can find it back.
+        # Or, we can store the log path in the session object.
+        return PROJECTS_DIR / self.project_id / f"rpc-log-{self.session_id}.log"
+
+    def _ensure_dir(self):
+        if not self.log_path.parent.exists():
+            self.log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def log(self, data: Any):
+        """Append a JSON-RPC message (or any dict) to the log file."""
+        try:
+            with open(self.log_path, "a", encoding="utf-8") as f:
+                # Add timestamp if not present (though Rust logs raw JSONRPC which doesn't always have it at top level)
+                # But for our parser we might want it.
+                # Rust reader handles [timestamp] prefix OR json content.
+                # We will write pure JSON lines.
+                line = json.dumps(data, ensure_ascii=False)
+                f.write(line + "\n")
+                # Debug print for troubleshooting
+                print(f"[RpcLogger] Wrote to {self.log_path.name}: {line[:100]}...")
+        except Exception as e:
+            print(f"Error writing to RPC log {self.log_path}: {e}")
+
+def _get_logger(session_id: str) -> Optional[RpcLogger]:
+    s = _sessions.get(session_id)
+    if s and "logger" in s:
+        return s["logger"]
+    return None
+
+# save_all_conversations removed as we now use real-time RpcLogger
 
 def _emit_progress(session_id: str, stage: str, message: str, percent: int, details: Optional[str] = None) -> None:
     payload = {"stage": stage, "message": message, "progress_percent": percent}
@@ -52,6 +109,22 @@ def _spawn_cli(command: str, working_directory: str, model: str):
 def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeout_seconds: int):
     def read_stdout():
         total = 0
+        log_buffer = []
+        def flush_log_buffer():
+            nonlocal log_buffer
+            if not log_buffer:
+                return
+            full_text = "".join(log_buffer)
+            log_buffer.clear()
+            logger = _get_logger(session_id)
+            if logger:
+                payload = {
+                    "method": "session/update",
+                    "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": full_text}}},
+                    "timestamp": datetime.utcnow().isoformat() + "Z"
+                }
+                logger.log(payload)
+
         for line in proc.stdout:
             txt = line.rstrip("\n")
             ln = txt[:LINE_LIMIT_BYTES]
@@ -67,6 +140,7 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                     status = parsed.get("status")
                     # print(f"[SESSION-PARSE] status={status}") # Debug parsed status
                     if status == "permission_request":
+                        flush_log_buffer()
                         data = parsed.get("content")
                         raw_data = parsed.get("raw", "")
                         events.emit(f"cli-io-{session_id}", {"type": "output", "data": raw_data})
@@ -122,6 +196,25 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                             "result": update.get("result")
                         })
                         
+                        # Log tool call update
+                        logger = _get_logger(session_id)
+                        if logger:
+                            payload = {
+                                "method": "session/update",
+                                "params": {
+                                    "update": {
+                                        "sessionUpdate": "tool_call_update",
+                                        "toolCallId": tool_call_id,
+                                        "status": tool_status,
+                                        "content": update.get("content") or [],
+                                        "serverName": update.get("serverName") or "local",
+                                        "toolName": update.get("toolName") or "unknown"
+                                    }
+                                },
+                                "timestamp": datetime.utcnow().isoformat() + "Z"
+                            }
+                            logger.log(payload)
+                        
                         # If failed, ensure we signal turn end if not already signaled
                         if tool_status == "failed":
                              print(f"[SESSION] Tool failed, emitting turn finished for {session_id}")
@@ -133,12 +226,24 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                         continue
 
                     if status == "turn_finished":
+                        flush_log_buffer()
                         stop_reason = (parsed.get("content") or {}).get("stopReason")
                         print(f"[SESSION] Turn finished: {stop_reason}")
                         events.emit(f"ai-turn-finished-{session_id}", {"stopReason": stop_reason})
+                        
+                        # Log turn finished
+                        logger = _get_logger(session_id)
+                        if logger:
+                            logger.log({
+                                "result": {
+                                    "stopReason": stop_reason
+                                },
+                                "timestamp": datetime.utcnow().isoformat() + "Z"
+                            })
                         continue
 
                     if status == "error":
+                        flush_log_buffer()
                         error_data = (parsed.get("content") or {}).get("error")
                         print(f"[SESSION] Protocol Error: {error_data}")
                         events.emit(f"ai-turn-finished-{session_id}", {"error": error_data})
@@ -158,6 +263,10 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                     events.emit(f"cli-io-{session_id}", {"type": "output", "data": cli_data})
                     if content:
                         events.emit(f"ai-output-{session_id}", content)
+                        # Buffer assistant message chunk for logging
+                        log_buffer.append(content)
+                        if len("".join(log_buffer)) > 100:
+                            flush_log_buffer()
             else:
                 events.emit(f"cli-io-{session_id}", {"type": "output", "data": ln})
             if total >= STREAM_LIMIT_BYTES:
@@ -217,11 +326,11 @@ def _process_queued_messages(session_id: str):
         if hasattr(proc, "handle_input"):
              proc.handle_input(msg)
         elif proc.stdin:
-            try:
+            if proc.poll() is not None:
+                print(f"Process {proc.pid} is dead. Cannot write queued message to stdin.")
+            else:
                 proc.stdin.write(msg + "\n")
                 proc.stdin.flush()
-            except Exception as e:
-                print(f"Error writing queued message to stdin: {e}")
 
 def start_session(session_id: str, working_directory: Optional[str], model: Optional[str], backend: Optional[str] = None, backend_config: Optional[Dict] = None) -> None:
     wd = working_directory or "."
@@ -239,8 +348,15 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
         "last_error_at": 0,
         "ready": False,
         "msg_queue": [],
+        "history": [],
+        "title": "New Conversation",
+        "started_at_iso": datetime.utcnow().isoformat() + "Z",
+        "current_assistant_message": "",
+        "logger": RpcLogger(session_id)
     }
-    print(f"[SESSION] Registered session {session_id}")
+    
+    # Initialize logger
+    print(f"[SESSION] Registered session {session_id} with logger at {_sessions[session_id]['logger'].log_path}")
 
     if not os.path.isdir(wd):
         _emit_progress(session_id, "failed", "Invalid working directory", 100, wd if wd else None)
@@ -252,14 +368,11 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
     # Permission check
     abs_wd = os.path.abspath(wd)
     print(f"[SESSION] 检查工作目录权限: {abs_wd}")
-    try:
-        test_file = os.path.join(abs_wd, ".perm_check")
-        with open(test_file, "w") as f:
-            f.write("ok")
-        os.remove(test_file)
+    test_file = os.path.join(abs_wd, ".perm_check")
+    if os.access(abs_wd, os.W_OK):
         print(f"[SESSION] 权限检查通过: 后端进程拥有写入权限")
-    except Exception as e:
-        print(f"[SESSION] 权限检查失败: 后端进程无法写入工作目录! Error: {e}")
+    else:
+        print(f"[SESSION] 权限检查失败: 后端进程无法写入工作目录!")
         print(f"[SESSION] 建议: 请尝试以管理员身份运行")
 
     backend_name = (backend or "").lower()
@@ -291,6 +404,12 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
                 _emit_progress(session_id, "creating_session", "Creating session", 95, wd if wd else None)
             elif backend_config:
                 api_key = str(backend_config.get("api_key") or "")
+                # Try to get API key from environment if not provided
+                if not api_key:
+                    api_key = os.environ.get("DASHSCOPE_API_KEY", "")
+                    if api_key:
+                        print(f"[SESSION] Using DASHSCOPE_API_KEY from environment")
+
                 base_url = str(backend_config.get("base_url") or "")
                 mdl_cfg = str(backend_config.get("model") or mdl)
                 if api_key and base_url and mdl_cfg:
@@ -354,6 +473,12 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
         def handshake():
             if backend_name == "qwen" and backend_config:
                 api_key = str(backend_config.get("api_key") or "")
+                # Try to get API key from environment if not provided
+                if not api_key:
+                    api_key = os.environ.get("DASHSCOPE_API_KEY", "")
+                    if api_key:
+                        print(f"[SESSION] Using DASHSCOPE_API_KEY from environment")
+
                 base_url = str(backend_config.get("base_url") or "")
                 mdl = str(backend_config.get("model") or mdl)
                 if api_key and base_url and mdl:
@@ -392,6 +517,20 @@ def send_message(session_id: str, message: str) -> None:
     sess = _sessions.get(session_id, {})
     events.emit(f"cli-io-{session_id}", {"type": "input", "data": message})
     
+    # Log user message (session/prompt)
+    logger = _get_logger(session_id)
+    if logger:
+        # Construct session/prompt payload
+        # This matches the Rust implementation structure
+        payload = {
+            "method": "session/prompt",
+            "params": {
+                "prompt": [{"type": "text", "text": message}]
+            },
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        logger.log(payload)
+    
     # Check if session is ready
     if not sess.get("ready", False):
         print(f"Session {session_id} not ready, queuing message")
@@ -405,11 +544,11 @@ def send_message(session_id: str, message: str) -> None:
         if hasattr(proc, "handle_input"):
              proc.handle_input(message)
         elif proc.stdin:
-            try:
+            if proc.poll() is not None:
+                print(f"Process {proc.pid} is dead. Cannot write to stdin.")
+            else:
                 proc.stdin.write(message + "\n")
                 proc.stdin.flush()
-            except Exception as e:
-                print(f"Error writing to stdin: {e}")
     else:
         # Fallback for simulation or error state
         def run():
@@ -444,15 +583,28 @@ def handle_permission_response(session_id: str, tool_call_id: str, outcome: str)
     print(f"[SESSION] 后端: 收到权限响应: id={tool_call_id} outcome={outcome}")
     s = _sessions.get(session_id)
     if not s:
-        print(f"[SESSION] Session {session_id} not found. Available: {list(_sessions.keys())}")
-        # Try to find a fallback session if only one exists
-        if len(_sessions) == 1:
-            fallback_id = list(_sessions.keys())[0]
-            print(f"[SESSION] Fallback: using single available session {fallback_id}")
-            s = _sessions[fallback_id]
-            session_id = fallback_id # Update local var
-        else:
-            return
+        print(f"[SESSION] Session {session_id} not found via direct lookup. Searching by proc.session_id...")
+        found = False
+        for cid, sess_data in _sessions.items():
+            proc = sess_data.get("proc")
+            # Check if proc is QwenProcess and has matching session_id
+            if proc and hasattr(proc, "session_id") and proc.session_id == session_id:
+                print(f"[SESSION] Found session {cid} matching UUID {session_id}")
+                s = sess_data
+                session_id = cid # Update local var to use internal ID
+                found = True
+                break
+        
+        if not found:
+            print(f"[SESSION] Session {session_id} not found. Available: {list(_sessions.keys())}")
+            # Try to find a fallback session if only one exists
+            if len(_sessions) == 1:
+                fallback_id = list(_sessions.keys())[0]
+                print(f"[SESSION] Fallback: using single available session {fallback_id}")
+                s = _sessions[fallback_id]
+                session_id = fallback_id # Update local var
+            else:
+                return
 
     if not s.get("alive"):
         print(f"[SESSION] Session {session_id} is marked as dead")

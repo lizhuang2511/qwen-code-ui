@@ -531,13 +531,14 @@
     "languageSwitcher": "切换语言",
     "currentLanguage": "当前语言：{{language}}",
     "directoryPanel": "目录",
-    "returnToDashboard": "返回主页",
-    "clickToReturnHome": "点击返回首页"
+    "returnToDashboard": "返回项目",
+    "clickToReturnHome": "返回项目"
   },
 
   "directoryPanel": {
     "title": "目录",
-    "noContent": "无目录内容"
+    "noContent": "无目录内容",
+    "openInFileManager": "在系统文件管理器中打开"
   },
 
   "newChatPlaceholder": {

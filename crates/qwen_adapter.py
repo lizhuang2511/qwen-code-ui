@@ -85,6 +85,12 @@ class QwenProcess:
             "id": self.request_id
         }
         json_req = json.dumps(req)
+        
+        # Check if process is alive before writing
+        if self.process and self.process.poll() is not None:
+            print(f"[QwenAdapter] Process {self.pid} is dead (exit code {self.process.poll()}). Cannot send request.")
+            return -1
+
         if self.process and self.process.stdin:
             print(f"[QwenAdapter] Sending: {json_req[:200]}...")
             data = (json_req + "\n").encode("utf-8")
@@ -173,8 +179,9 @@ class QwenProcess:
                 print("[QwenAdapter] Read loop: EOF received")
                 break
             line = line_bytes.decode("utf-8", errors="replace")
-            # Log raw line for debugging
-            print(f"[QwenAdapter] STDOUT: {line[:200].strip()}")
+            # Log raw line for debugging (skip chunks to avoid spam)
+            if '"sessionUpdate":"agent_message_chunk"' not in line and '"sessionUpdate": "agent_message_chunk"' not in line:
+                print(f"[QwenAdapter] STDOUT: {line[:200].strip()}")
             # Forward raw line to queue for session.py to handle (parsing, emitting events)
             self.stdout_queue.put(line)
 

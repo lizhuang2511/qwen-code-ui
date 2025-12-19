@@ -1,0 +1,48 @@
+{"method": "session/prompt", "params": {"prompt": [{"type": "text", "text": "新建文件，计算5+10"}]}, "timestamp": "2025-12-19T06:54:27.878631Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "I"}}}, "timestamp": "2025-12-19T06:54:35.160315Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "'ll create a new"}}}, "timestamp": "2025-12-19T06:54:35.226203Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " file that"}}}, "timestamp": "2025-12-19T06:54:35.233415Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " calculates 5+"}}}, "timestamp": "2025-12-19T06:54:35.315692Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "10. Let"}}}, "timestamp": "2025-12-19T06:54:35.395424Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " me create a simple"}}}, "timestamp": "2025-12-19T06:54:35.407223Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " Python script for this"}}}, "timestamp": "2025-12-19T06:54:35.563492Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " calculation"}}}, "timestamp": "2025-12-19T06:54:35.615184Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": ".\n\n"}}}, "timestamp": "2025-12-19T06:54:35.621251Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "tool_call_update", "toolCallId": "call_4439f75361d846bb9a8cabe6", "status": "completed", "content": [{"type": "diff", "path": "calculate_sum.py", "oldText": "", "newText": "#!/usr/bin/env python3\n\"\"\"\nSimple script to calculate 5 + 10\n\"\"\"\n\ndef main():\n    result = 5 + 10\n    print(f\"5 + 10 = {result}\")\n\nif __name__ == \"__main__\":\n    main()"}], "serverName": "local", "toolName": "unknown"}}, "timestamp": "2025-12-19T06:56:26.580334Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "I"}}}, "timestamp": "2025-12-19T06:56:31.725220Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "'ve"}}}, "timestamp": "2025-12-19T06:56:31.757726Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " created a"}}}, "timestamp": "2025-12-19T06:56:31.794522Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " new Python"}}}, "timestamp": "2025-12-19T06:56:31.848859Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " file called `calculate"}}}, "timestamp": "2025-12-19T06:56:31.877278Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "_sum.py` in"}}}, "timestamp": "2025-12-19T06:56:31.889413Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " your directory that calculates"}}}, "timestamp": "2025-12-19T06:56:32.041894Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " 5 +"}}}, "timestamp": "2025-12-19T06:56:32.052361Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " 10."}}}, "timestamp": "2025-12-19T06:56:32.062860Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " The file contains:\n\n"}}}, "timestamp": "2025-12-19T06:56:32.133158Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "```python\n#!/"}}}, "timestamp": "2025-12-19T06:56:32.153401Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "usr/bin/env python"}}}, "timestamp": "2025-12-19T06:56:32.197056Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "3\n\"\"\"\nSimple"}}}, "timestamp": "2025-12-19T06:56:32.213917Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " script to calculate "}}}, "timestamp": "2025-12-19T06:56:32.259262Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "5 + 1"}}}, "timestamp": "2025-12-19T06:56:32.274713Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "0\n\"\"\"\n\ndef"}}}, "timestamp": "2025-12-19T06:56:32.355165Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " main"}}}, "timestamp": "2025-12-19T06:56:32.367454Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "():\n    result ="}}}, "timestamp": "2025-12-19T06:56:32.398591Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " 5 + "}}}, "timestamp": "2025-12-19T06:56:32.414222Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "10\n   "}}}, "timestamp": "2025-12-19T06:56:32.435990Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " print(f\"5"}}}, "timestamp": "2025-12-19T06:56:32.487803Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " + 10"}}}, "timestamp": "2025-12-19T06:56:32.510169Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " = {result}\")\n\n"}}}, "timestamp": "2025-12-19T06:56:32.676678Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "if __name__"}}}, "timestamp": "2025-12-19T06:56:32.702319Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " == \"__main__\":\n"}}}, "timestamp": "2025-12-19T06:56:32.724217Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "    main()\n``"}}}, "timestamp": "2025-12-19T06:56:32.747429Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "`\n\nThis script defines"}}}, "timestamp": "2025-12-19T06:56:32.773686Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " a simple function that"}}}, "timestamp": "2025-12-19T06:56:32.840670Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " adds"}}}, "timestamp": "2025-12-19T06:56:32.858341Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " 5 and "}}}, "timestamp": "2025-12-19T06:56:32.877338Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "10 together"}}}, "timestamp": "2025-12-19T06:56:32.896100Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " and prints the result"}}}, "timestamp": "2025-12-19T06:56:32.968434Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": ". You"}}}, "timestamp": "2025-12-19T06:56:32.986102Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " can run it with"}}}, "timestamp": "2025-12-19T06:56:33.069846Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " Python to see the"}}}, "timestamp": "2025-12-19T06:56:33.086667Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " calculation"}}}, "timestamp": "2025-12-19T06:56:33.105385Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " result."}}}, "timestamp": "2025-12-19T06:56:33.172410Z"}

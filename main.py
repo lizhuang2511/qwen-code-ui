@@ -13,7 +13,7 @@ if CRATES_DIR not in sys.path:
     sys.path.insert(0, CRATES_DIR)
 
 from backend.api import Api  # type: ignore
-
+import session
 
 def get_entry_html() -> str:
     paths = [
@@ -63,10 +63,13 @@ def start_ticker():
                 return
             w = webview.windows[0]
             payload = {"time": int(threading.get_native_id())}
-            w.evaluate_js(
-                'window.dispatchEvent(new CustomEvent("ticker",{detail:%s}))'
-                % json.dumps(payload)
-            )
+            try:
+                w.evaluate_js(
+                    'window.dispatchEvent(new CustomEvent("ticker",{detail:%s}))'
+                    % json.dumps(payload)
+                )
+            except:
+                pass
             threading.Event().wait(1.0)
 
     t = threading.Thread(target=loop, daemon=True)

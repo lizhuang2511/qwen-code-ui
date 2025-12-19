@@ -18,8 +18,8 @@ export const defaultGeminiConfig: GeminiConfig = {
 export const defaultQwenConfig: QwenConfig = {
   type: "qwen",
   apiKey: "",
-  baseUrl: "https://openrouter.ai/api/v1",
-  model: "qwen/qwen3-coder:free",
+  baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  model: "qwen-max",
   useOAuth: true,
 };
 

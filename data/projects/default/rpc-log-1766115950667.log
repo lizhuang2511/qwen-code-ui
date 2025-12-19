@@ -1,0 +1,17 @@
+{"method": "session/prompt", "params": {"prompt": [{"type": "text", "text": "你好"}]}, "timestamp": "2025-12-19T03:46:52.453398Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "你好"}}}, "timestamp": "2025-12-19T03:46:57.116569Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "！看起来"}}}, "timestamp": "2025-12-19T03:46:57.306277Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "你有一个"}}}, "timestamp": "2025-12-19T03:46:57.384706Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "包含"}}}, "timestamp": "2025-12-19T03:46:57.463294Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "两个Python文件的"}}}, "timestamp": "2025-12-19T03:46:57.542828Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "项目"}}}, "timestamp": "2025-12-19T03:46:57.593728Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "：\n- `calculate"}}}, "timestamp": "2025-12-19T03:46:57.612817Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "_"}}}, "timestamp": "2025-12-19T03:46:57.629988Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "1_plus_5"}}}, "timestamp": "2025-12-19T03:46:57.647071Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": ".py`\n- `"}}}, "timestamp": "2025-12-19T03:46:57.661935Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "calculate_sum.py`\n\n"}}}, "timestamp": "2025-12-19T03:46:57.680089Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "有什么我可以帮你的"}}}, "timestamp": "2025-12-19T03:46:57.695145Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "吗"}}}, "timestamp": "2025-12-19T03:46:57.808321Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "？比如运行这些"}}}, "timestamp": "2025-12-19T03:46:57.827125Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "脚本或解释"}}}, "timestamp": "2025-12-19T03:46:57.845770Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "它们的功能？"}}}, "timestamp": "2025-12-19T03:46:57.917178Z"}

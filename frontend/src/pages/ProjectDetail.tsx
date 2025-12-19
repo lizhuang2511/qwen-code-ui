@@ -23,6 +23,13 @@ import {
   DialogTrigger,
   DialogClose,
 } from "../components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "../components/ui/sheet";
+import { DirectoryPanel } from "../components/common/DirectoryPanel";
 
 type Discussion = {
   id: string;
@@ -55,6 +62,7 @@ export default function ProjectDetailPage() {
     string | null
   >(null);
   const { progress, startListeningForSession } = useSessionProgress();
+  const [isFileBrowserOpen, setIsFileBrowserOpen] = React.useState(false);
 
   // Debug logging
   React.useEffect(() => {
@@ -248,7 +256,10 @@ export default function ProjectDetailPage() {
           {/* Git Information */}
           {projectData && (
             <div className="mt-4">
-              <GitInfo directory={projectData.metadata.path} />
+              <GitInfo
+                directory={projectData.metadata.path}
+                onFolderClick={() => setIsFileBrowserOpen(true)}
+              />
             </div>
           )}
 
@@ -377,6 +388,21 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       </div>
+      <Sheet open={isFileBrowserOpen} onOpenChange={setIsFileBrowserOpen}>
+        <SheetContent side="right" className="w-[400px] sm:w-[540px] p-0 flex flex-col h-full">
+          <SheetHeader className="p-4 border-b flex-shrink-0">
+            <SheetTitle>{t("directoryPanel.title")}</SheetTitle>
+          </SheetHeader>
+          {projectData && (
+            <div className="flex-1 min-h-0 overflow-hidden relative">
+              <DirectoryPanel
+                workingDirectory={projectData.metadata.path}
+                className="h-full border-0 w-full"
+              />
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

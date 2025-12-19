@@ -1,0 +1,14 @@
+{"method": "session/prompt", "params": {"prompt": [{"type": "text", "text": "你好"}]}, "timestamp": "2025-12-19T04:00:19.377813Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "你好"}}}, "timestamp": "2025-12-19T04:00:25.494545Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "！看起来"}}}, "timestamp": "2025-12-19T04:00:25.647964Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "你有一个"}}}, "timestamp": "2025-12-19T04:00:25.807003Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "Python"}}}, "timestamp": "2025-12-19T04:00:25.964427Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "项目，里面有两个"}}}, "timestamp": "2025-12-19T04:00:26.121685Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "计算文件：`"}}}, "timestamp": "2025-12-19T04:00:26.228966Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "calculate"}}}, "timestamp": "2025-12-19T04:00:26.256594Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "_1_plus_"}}}, "timestamp": "2025-12-19T04:00:26.293418Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "5.py` 和"}}}, "timestamp": "2025-12-19T04:00:26.322659Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " `calculate_sum.py"}}}, "timestamp": "2025-12-19T04:00:26.353335Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "`。需要我"}}}, "timestamp": "2025-12-19T04:00:26.400358Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "帮你处理"}}}, "timestamp": "2025-12-19T04:00:26.427988Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "什么吗？"}}}, "timestamp": "2025-12-19T04:00:26.459496Z"}

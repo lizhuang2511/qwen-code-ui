@@ -26,6 +26,6 @@ def emit(event: str, payload) -> None:
                 'window.dispatchEvent(new CustomEvent("%s",{detail:%s}))'
                 % (event, json.dumps(payload))
             )
-    except Exception:
-        # No handler and no webview, or webview disposed
+    except:
+        # No handler and no webview, or webview disposed (catch-all for CLR/System exceptions)
         pass

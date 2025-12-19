@@ -545,7 +545,8 @@
   },
   "directoryPanel": {
     "title": "Directory",
-    "noContent": "No directory content"
+    "noContent": "No directory content",
+    "openInFileManager": "Open in File Manager"
   },
 
   "newChatPlaceholder": {

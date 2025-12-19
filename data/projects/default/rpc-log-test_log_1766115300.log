@@ -1,0 +1,1 @@
+{"method": "session/prompt", "params": {"prompt": [{"type": "text", "text": "Hello from logger!"}]}, "timestamp": "2025-12-19T03:35:01.098138Z"}

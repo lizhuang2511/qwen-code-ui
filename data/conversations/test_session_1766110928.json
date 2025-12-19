@@ -1,0 +1,16 @@
+{
+  "id": "test_session_1766110928",
+  "title": "Hello, world!",
+  "started_at_iso": "2025-12-19T02:22:08.591229Z",
+  "messages": [
+    {
+      "sender": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "Hello, world!"
+        }
+      ]
+    }
+  ]
+}

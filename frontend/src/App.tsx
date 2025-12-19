@@ -441,6 +441,23 @@ function RootLayoutContent() {
     }
   }, []);
 
+  // Handle new conversation from DirectoryPanel
+  const handleNewConversationFromDirectory = useCallback(async () => {
+    if (!workingDirectory) return;
+    
+    // Determine folder name from workingDirectory
+    const normalizedPath = workingDirectory.replace(/\\/g, "/");
+    const folderName = normalizedPath.split("/").filter(Boolean).pop() || workingDirectory;
+    const title = `Chat in ${folderName}`;
+    
+    await startNewConversation(title, workingDirectory);
+    
+    // If we are not on the home page, navigate there
+    if (location.pathname !== "/") {
+      navigate("/");
+    }
+  }, [workingDirectory, startNewConversation, location.pathname, navigate]);
+
   // Handle conversation selection from sidebar
   const handleConversationSelect = useCallback(
     (conversationId: string) => {
@@ -523,7 +540,10 @@ function RootLayoutContent() {
                 onDirectoryPanelToggle={toggleDirectoryPanel}
                 isDirectoryPanelOpen={directoryPanelOpen}
                 hasActiveConversation={!!activeConversation}
-                onReturnToDashboard={() => setActiveConversation(null)}
+                onReturnToDashboard={() => {
+                  setActiveConversation(null);
+                  navigate("/projects");
+                }}
                 onOpenSettings={() => setIsSettingsOpen(true)}
               />
             </div>
@@ -568,6 +588,7 @@ function RootLayoutContent() {
                     console.log("📁 [App] Directory changed to:", path);
                   }}
                   onMentionInsert={handleMentionInsert}
+                  onNewConversation={handleNewConversationFromDirectory}
                   className="w-[20rem] h-full"
                 />
               </div>

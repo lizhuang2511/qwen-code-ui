@@ -1,0 +1,7 @@
+{"method": "session/prompt", "params": {"prompt": [{"type": "text", "text": "你好"}]}, "timestamp": "2025-12-19T06:44:42.977925Z"}
+{"method": "session/prompt", "params": {"prompt": [{"type": "text", "text": "你好"}]}, "timestamp": "2025-12-19T06:45:50.684752Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "你好"}}}, "timestamp": "2025-12-19T06:46:04.632278Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "！有什么"}}}, "timestamp": "2025-12-19T06:46:04.787268Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "我可以帮你的吗"}}}, "timestamp": "2025-12-19T06:46:04.926122Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "？"}}}, "timestamp": "2025-12-19T06:46:04.958892Z"}
+{"method": "session/prompt", "params": {"prompt": [{"type": "text", "text": "新建文件计算5+50"}]}, "timestamp": "2025-12-19T06:46:35.774563Z"}

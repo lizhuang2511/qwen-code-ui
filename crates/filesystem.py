@@ -1,5 +1,6 @@
 import os
 import base64
+import shutil
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -41,7 +42,7 @@ def read_file_content(path: str) -> Dict:
         error = "File not found"
     data = p.read_bytes() if error is None else b""
     decoded = data.decode(encoding, errors="ignore") if data else ""
-    is_text = True if decoded else False
+    is_text = True if (decoded or len(data) == 0) else False
     is_binary = not is_text
     content: Optional[str] = decoded if is_text else None
     stat = p.stat() if p.exists() else None
@@ -64,3 +65,56 @@ def write_file_content(path: str, content: str) -> Dict:
     p = Path(path)
     p.write_text(content, encoding="utf-8")
     return read_file_content(str(p))
+
+def copy_files(source_paths: List[str], target_directory: str) -> List[str]:
+    copied_files = []
+    target_path = Path(target_directory)
+    
+    if not target_path.exists():
+        return copied_files
+
+    for source in source_paths:
+        src_path = Path(source)
+        if src_path.exists():
+            dst_path = target_path / src_path.name
+            
+            # Auto rename if file exists
+            if dst_path.exists():
+                stem = src_path.stem
+                suffix = src_path.suffix
+                counter = 1
+                while dst_path.exists():
+                    dst_path = target_path / f"{stem} ({counter}){suffix}"
+                    counter += 1
+            
+            if src_path.is_dir():
+                shutil.copytree(source, dst_path)
+            else:
+                shutil.copy2(source, dst_path)
+            copied_files.append(str(dst_path))
+            
+    return copied_files
+
+def create_directory(path: str) -> bool:
+    p = Path(path)
+    if not p.exists():
+        p.mkdir(parents=True, exist_ok=True)
+        return True
+    return False
+
+def delete_path(path: str) -> bool:
+    p = Path(path)
+    if p.exists():
+        if p.is_dir():
+            shutil.rmtree(path)
+        else:
+            p.unlink()
+        return True
+    return False
+
+def rename_path(old_path: str, new_path: str) -> bool:
+    p = Path(old_path)
+    if p.exists():
+        p.rename(new_path)
+        return True
+    return False

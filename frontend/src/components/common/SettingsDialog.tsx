@@ -327,7 +327,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                           baseUrl: e.target.value,
                         })
                       }
-                      placeholder="https://openrouter.ai/api/v1"
+                      placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1"
                     />
                   </div>
 
@@ -335,16 +335,70 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">
                       {t("conversations.model")}
                     </label>
-                    <Input
-                      type="text"
-                      value={qwenConfig.model}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        updateQwenConfig({ model: value });
-                        onModelChange?.(value || "qwen/qwen3-coder:free");
+                    <Select
+                      value={
+                        [
+                          "qwen-max",
+                          "qwen-plus",
+                          "qwen-turbo",
+                          "qwen-coder-plus",
+                          "qwen-coder-turbo",
+                        ].includes(qwenConfig.model || "")
+                          ? qwenConfig.model
+                          : "custom"
+                      }
+                      onValueChange={(value) => {
+                        if (value !== "custom") {
+                          updateQwenConfig({ model: value });
+                          onModelChange?.(value);
+                        } else {
+                          // If switching to custom, keep current value but show input
+                          // Or clear it? Let's keep it to allow editing
+                        }
                       }}
-                      placeholder="qwen/qwen3-coder:free"
-                    />
+                    >
+                      <SelectTrigger className="w-full mb-2">
+                        <SelectValue placeholder="Select Model" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="qwen-max">
+                          Qwen Max (Flagship)
+                        </SelectItem>
+                        <SelectItem value="qwen-plus">
+                          Qwen Plus (Balanced)
+                        </SelectItem>
+                        <SelectItem value="qwen-turbo">
+                          Qwen Turbo (Fast)
+                        </SelectItem>
+                        <SelectItem value="qwen-coder-plus">
+                          Qwen Coder Plus
+                        </SelectItem>
+                        <SelectItem value="qwen-coder-turbo">
+                          Qwen Coder Turbo
+                        </SelectItem>
+                        <SelectItem value="custom">Custom...</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {(![
+                      "qwen-max",
+                      "qwen-plus",
+                      "qwen-turbo",
+                      "qwen-coder-plus",
+                      "qwen-coder-turbo",
+                    ].includes(qwenConfig.model || "") ||
+                      qwenConfig.model === "custom") && (
+                      <Input
+                        type="text"
+                        value={qwenConfig.model}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          updateQwenConfig({ model: value });
+                          onModelChange?.(value || "qwen-max");
+                        }}
+                        placeholder="qwen-max"
+                      />
+                    )}
                   </div>
 
                   {/* YOLO Mode Checkbox */}

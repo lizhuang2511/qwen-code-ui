@@ -182,7 +182,7 @@ export function FileContentViewer({
   };
 
   const handleCopy = async () => {
-    if (!fileContent?.content) return;
+    if (fileContent?.content === null || fileContent?.content === undefined) return;
 
     try {
       await navigator.clipboard.writeText(fileContent.content);
@@ -194,7 +194,7 @@ export function FileContentViewer({
   };
 
   const handleDownload = () => {
-    if (!fileContent?.content || !filePath) return;
+    if (fileContent?.content === null || fileContent?.content === undefined || !filePath) return;
     downloadTextContent(fileContent.content, filePath);
   };
 

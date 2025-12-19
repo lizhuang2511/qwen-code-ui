@@ -1,0 +1,5 @@
+{"method": "session/prompt", "params": {"prompt": [{"type": "text", "text": "你好"}]}, "timestamp": "2025-12-19T06:20:24.012066Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "你好"}}}, "timestamp": "2025-12-19T06:20:27.970702Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "！有什么"}}}, "timestamp": "2025-12-19T06:20:28.113765Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "可以帮助"}}}, "timestamp": "2025-12-19T06:20:28.254704Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "你的吗？"}}}, "timestamp": "2025-12-19T06:20:28.388139Z"}

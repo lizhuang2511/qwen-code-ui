@@ -180,6 +180,15 @@ export interface API {
     is_binary: boolean;
     error: string | null;
   }>;
+  open_with_default_app(params: { path: string }): Promise<void>;
+  copy_files(params: { paths: string[]; target: string }): Promise<string[]>;
+  create_directory(params: { path: string }): Promise<boolean>;
+  delete_path(params: { path: string }): Promise<boolean>;
+  move_path(params: { oldPath: string; newPath: string }): Promise<boolean>;
+  get_clipboard_content(): Promise<{
+    type: "files" | "text" | "empty";
+    content: string[] | string | null;
+  }>;
 }
 
 export type APICommand = keyof API;

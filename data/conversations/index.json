@@ -1,0 +1,60 @@
+{
+  "items": [
+    {
+      "id": "1766114879386",
+      "title": "New Conversation",
+      "started_at_iso": "2025-12-19T03:27:59.459285Z",
+      "message_count": 0,
+      "last_activity_iso": "2025-12-19T03:28:07.939659Z"
+    },
+    {
+      "id": "1766114715809",
+      "title": "你好",
+      "started_at_iso": "2025-12-19T03:25:15.885527Z",
+      "message_count": 2,
+      "last_activity_iso": "2025-12-19T03:26:50.702156Z"
+    },
+    {
+      "id": "1766113754212",
+      "title": "你好",
+      "started_at_iso": "2025-12-19T03:09:14.287247Z",
+      "message_count": 3,
+      "last_activity_iso": "2025-12-19T03:14:47.763099Z"
+    },
+    {
+      "id": "1766113532679",
+      "title": "你好",
+      "started_at_iso": "2025-12-19T03:05:32.752566Z",
+      "message_count": 1,
+      "last_activity_iso": "2025-12-19T03:05:58.149924Z"
+    },
+    {
+      "id": "1766113046718",
+      "title": "New Conversation",
+      "started_at_iso": "2025-12-19T02:57:26.793259Z",
+      "message_count": 0,
+      "last_activity_iso": "2025-12-19T02:57:26.795423Z"
+    },
+    {
+      "id": "1766111848012",
+      "title": "齿轮模数是什么",
+      "started_at_iso": "2025-12-19T02:37:28.069522Z",
+      "message_count": 1,
+      "last_activity_iso": "2025-12-19T02:38:37.667555Z"
+    },
+    {
+      "id": "1766111817540",
+      "title": "你好",
+      "started_at_iso": "2025-12-19T02:36:57.612789Z",
+      "message_count": 1,
+      "last_activity_iso": "2025-12-19T02:37:13.397455Z"
+    },
+    {
+      "id": "test_session_1766110928",
+      "title": "Hello, world!",
+      "started_at_iso": "2025-12-19T02:22:08.591229Z",
+      "message_count": 1,
+      "last_activity_iso": "2025-12-19T02:22:08.624852Z"
+    }
+  ]
+}

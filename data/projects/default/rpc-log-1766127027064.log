@@ -1,0 +1,18 @@
+{"method": "session/prompt", "params": {"prompt": [{"type": "text", "text": "你好"}]}, "timestamp": "2025-12-19T06:51:30.816439Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "你好"}}}, "timestamp": "2025-12-19T06:51:35.885117Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "！有什么"}}}, "timestamp": "2025-12-19T06:51:36.006024Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "我可以帮你的吗"}}}, "timestamp": "2025-12-19T06:51:36.118821Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "？"}}}, "timestamp": "2025-12-19T06:51:36.196246Z"}
+{"method": "session/prompt", "params": {"prompt": [{"type": "text", "text": "新建文计算1+1=2"}]}, "timestamp": "2025-12-19T06:51:48.275123Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "我"}}}, "timestamp": "2025-12-19T06:51:51.225642Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "将帮你"}}}, "timestamp": "2025-12-19T06:51:51.340968Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "创建一个计算"}}}, "timestamp": "2025-12-19T06:51:51.460206Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " "}}}, "timestamp": "2025-12-19T06:51:51.506988Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "1+1="}}}, "timestamp": "2025-12-19T06:51:51.528384Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "2 的程序。"}}}, "timestamp": "2025-12-19T06:51:51.551516Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "让我"}}}, "timestamp": "2025-12-19T06:51:51.573060Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "先为你创建一个"}}}, "timestamp": "2025-12-19T06:51:51.601026Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "简单的"}}}, "timestamp": "2025-12-19T06:51:51.628350Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " Python 文件来演示"}}}, "timestamp": "2025-12-19T06:51:51.684146Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "这个计算。\n\n"}}}, "timestamp": "2025-12-19T06:51:51.709461Z"}
+{"method": "session/prompt", "params": {"prompt": [{"type": "text", "text": "继续"}]}, "timestamp": "2025-12-19T06:52:47.420672Z"}

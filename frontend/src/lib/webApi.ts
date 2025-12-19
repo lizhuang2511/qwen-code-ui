@@ -249,6 +249,45 @@ export const webApi: API = {
   },
  
   async quit_app(): Promise<void> {},
+
+  async open_with_default_app(_params: { path: string }): Promise<void> {
+    console.warn("open_with_default_app is not supported in web mode");
+  },
+
+  async copy_files(params) {
+    const response = await apiClient.post<string[]>("/copy-files", params);
+    return response.data;
+  },
+
+  async create_directory(_params) {
+    // Web mode implementation if needed, or throw error
+    console.warn("create_directory not implemented in web mode");
+    return false;
+  },
+
+  async delete_path(_params) {
+    console.warn("delete_path not implemented in web mode");
+    return false;
+  },
+
+  async move_path(_params) {
+    console.warn("move_path not implemented in web mode");
+    return false;
+  },
+
+  async get_clipboard_content() {
+    // In web mode, we can try to use navigator.clipboard if available, 
+    // but file system access is restricted.
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        return { type: "text", content: text };
+      }
+    } catch (e) {
+      console.warn("Clipboard access failed", e);
+    }
+    return { type: "empty", content: null };
+  },
 };
 
 export interface RecentChat {
