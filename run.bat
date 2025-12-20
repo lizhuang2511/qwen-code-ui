@@ -13,4 +13,3 @@ if errorlevel 1 (
 
 REM Run the Python script
 python start.py
-pause

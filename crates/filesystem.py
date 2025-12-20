@@ -63,6 +63,17 @@ def read_binary_file_as_base64(path: str) -> str:
 
 def write_file_content(path: str, content: str) -> Dict:
     p = Path(path)
+    if p.exists() and p.is_dir():
+        return {
+            "path": str(p),
+            "content": None,
+            "size": 0,
+            "modified": 0,
+            "encoding": "utf-8",
+            "is_text": False,
+            "is_binary": False,
+            "error": "Target path is a directory",
+        }
     p.write_text(content, encoding="utf-8")
     return read_file_content(str(p))
 

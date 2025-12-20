@@ -19,7 +19,7 @@ class CliClient:
 
 
 STREAM_LIMIT_BYTES = 10 * 1024 * 1024
-LINE_LIMIT_BYTES = 16 * 1024
+LINE_LIMIT_BYTES = 10 * 1024 * 1024
 
 
 def _which(candidate: str) -> Optional[str]:
