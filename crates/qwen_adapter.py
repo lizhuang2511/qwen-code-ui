@@ -13,10 +13,11 @@ class QwenProcess:
     Adapts the Qwen CLI (using persistent ACP protocol) to a process-like interface
     compatible with session.py.
     """
-    def __init__(self, executable: str, model: Optional[str] = None, cwd: Optional[str] = None):
+    def __init__(self, executable: str, model: Optional[str] = None, cwd: Optional[str] = None, env_vars: Optional[Dict[str, str]] = None):
         self.executable = executable
         self.model = model
         self.cwd = cwd or os.getcwd()
+        self.env_vars = env_vars or {}
         self.history: List[Dict[str, str]] = []
         self.stdout_queue = queue.Queue()
         self.stderr_queue = queue.Queue()
@@ -50,6 +51,10 @@ class QwenProcess:
         
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
+        
+        # Merge custom env vars
+        if self.env_vars:
+            env.update(self.env_vars)
         
         print(f"[QwenAdapter] Starting persistent process: {cmd}")
         print(f"[QwenAdapter] Process CWD: {self.cwd}")

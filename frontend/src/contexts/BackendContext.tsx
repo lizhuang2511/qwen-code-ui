@@ -224,13 +224,16 @@ export const BackendProvider: React.FC<BackendProviderProps> = ({
         ? (currentConfig as GeminiConfig).defaultModel
         : state.selectedBackend === "llxprt"
           ? (currentConfig as LLxprtConfig).model
-          : (currentConfig as QwenConfig).model;
+          : state.selectedBackend === "qwen" &&
+            (currentConfig as QwenConfig).useOAuth
+            ? "qwenfree"
+            : (currentConfig as QwenConfig).model;
 
     const getApiConfig = (): ApiConfig | null => {
       if (state.selectedBackend === "qwen") {
         const qwenConfig = state.configs.qwen;
         if (qwenConfig.useOAuth) {
-          return { model: qwenConfig.model };
+          return { model: "qwenfree" };
         } else {
           return {
             api_key: qwenConfig.apiKey,

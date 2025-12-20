@@ -381,7 +381,37 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
         exe = resolve_executable("qwen")
         _emit_progress(session_id, "validating_cli", "Validating CLI availability", 20, exe)
         
-        proc = QwenProcess(exe, mdl, wd)
+        # Determine mode from config or fallback to file existence
+        use_oauth = True
+        api_key = ""
+        if backend_config:
+             use_oauth = backend_config.get("useOAuth", True)
+             api_key = backend_config.get("apiKey", "")
+        else:
+             # Fallback if no config provided (e.g. tests)
+             use_oauth = QwenProcess.check_credentials()
+
+        mdl_to_use = mdl
+        env_vars = {}
+
+        if use_oauth:
+            # OAuth Mode: Enforce qwenfree if credentials exist or we expect them
+            # Note: If credentials don't exist, CLI might prompt or fail, but we follow user instruction to use OAuth mode for qwenfree.
+            if QwenProcess.check_credentials():
+                 print(f"[SESSION] OAuth mode enabled and credentials found. Enforcing model: qwenfree")
+                 mdl_to_use = "qwenfree"
+            else:
+                 print(f"[SESSION] OAuth mode enabled but no credentials found. Keeping model {mdl} (CLI may prompt)")
+        else:
+            # OpenAI Mode: Use provided model and inject API Key
+            print(f"[SESSION] OpenAI mode enabled. Using model: {mdl}")
+            if api_key:
+                print(f"[SESSION] Injecting DASHSCOPE_API_KEY from config")
+                env_vars["DASHSCOPE_API_KEY"] = api_key
+                # Also set OPENAI_API_KEY just in case
+                env_vars["OPENAI_API_KEY"] = api_key
+
+        proc = QwenProcess(exe, mdl_to_use, wd, env_vars=env_vars)
         
         _emit_progress(session_id, "spawning_process", "Spawning process", 40, wd if wd else None)
         print(f"[SESSION] {session_id} spawn_adapter backend={backend_name} exe={exe} model={mdl} cwd={wd}")

@@ -1,0 +1,5 @@
+{"method": "session/prompt", "params": {"prompt": [{"type": "text", "text": "你好，你是什么模型"}]}, "timestamp": "2025-12-20T01:24:24.560161Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "我是Qwen Code，阿里巴巴最新推出的代码大模型。我专门针对代码理解和生成进行了优化，可以帮助你进行各种编程任务，比如：\n\n- 解释现有代码的逻辑和结构\n- 编写新功能或修复bug\n- 重构代码以提高"}}}, "timestamp": "2025-12-20T01:24:30.757057Z"}
+{"method": "session/prompt", "params": {"prompt": [{"type": "text", "text": "你不是qwenmax吗"}]}, "timestamp": "2025-12-20T01:24:58.691836Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "可读性或性能\n- 添加测试用例\n- 理解项目架构和依赖关系\n- 回答编程相关的技术问题\n\n你可以告诉我你想要实现什么功能，或者给我一段代码让我帮你分析，我会尽力协助你完成任务。我是Qwen Code，是"}}}, "timestamp": "2025-12-20T01:25:43.417087Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "专门针对代码场景优化的模型。虽然我和Qwen Max都属于通义千问系列，但我更专注于编程相关任务，在代码理解、生成、修复等方面有更强的能力。\n\n你可以把我看作是处理代码任务的专业版本。如果你有任何编程问题"}}}, "timestamp": "2025-12-20T01:25:44.482937Z"}

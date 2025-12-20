@@ -1,0 +1,8 @@
+{"method": "session/prompt", "params": {"prompt": [{"type": "text", "text": "你好"}]}, "timestamp": "2025-12-20T03:57:20.659580Z"}
+{"method": "session/prompt", "params": {"prompt": [{"type": "text", "text": "你是什么模型"}]}, "timestamp": "2025-12-20T03:57:32.782576Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "你好！有什么我可以帮你的吗？我是通义千问（Qwen），阿里巴巴集团旗下的通义实验室自主研发的超大规模语言模型。我能够回答问题、创作文字，例如写故事、写公文、写邮件、写剧本、逻辑推理、编程等，还能表达观点，玩游戏等"}}}, "timestamp": "2025-12-20T03:57:35.761455Z"}
+{"method": "session/prompt", "params": {"prompt": [{"type": "text", "text": "你是qwencode吗"}]}, "timestamp": "2025-12-20T03:57:44.509992Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "。如果你有任何问题或需要帮助，欢迎随时告诉我！我是Qwen，阿里巴巴集团旗下的通义实验室自主研发的超大规模语言模型。\n\n而\"QwenCode\"是我所在的项目或环境的名称，在这个环境中你可以使用我来处理各种"}}}, "timestamp": "2025-12-20T03:57:48.653834Z"}
+{"method": "session/prompt", "params": {"prompt": [{"type": "text", "text": "你是免费的吗"}]}, "timestamp": "2025-12-20T03:58:00.190475Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "代码任务，比如理解代码、生成代码、修复错误等。所以简单来说，我是Qwen，而QwenCode是这个特定的项目/工作空间的名称。作为一个AI模型，我本身不收费，但我的使用通常通过阿里云的API服务提供，该服务可能"}}}, "timestamp": "2025-12-20T03:58:03.070059Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "需要付费。\n\n对于普通用户来说，可以在一些公开场合免费体验我的部分功能，如在通义官网、通义APP或其他官方开放的平台中进行有限次数的体验。如果需要大量调用或企业级应用，则需要购买相应的API服务。\n\n具体收费标准请参"}}}, "timestamp": "2025-12-20T03:58:04.311474Z"}
