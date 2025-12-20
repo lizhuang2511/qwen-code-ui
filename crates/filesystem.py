@@ -71,27 +71,35 @@ def copy_files(source_paths: List[str], target_directory: str) -> List[str]:
     target_path = Path(target_directory)
     
     if not target_path.exists():
-        return copied_files
+        try:
+            target_path.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            print(f"Failed to create target directory: {e}")
+            return copied_files
 
     for source in source_paths:
-        src_path = Path(source)
-        if src_path.exists():
-            dst_path = target_path / src_path.name
-            
-            # Auto rename if file exists
-            if dst_path.exists():
-                stem = src_path.stem
-                suffix = src_path.suffix
-                counter = 1
-                while dst_path.exists():
-                    dst_path = target_path / f"{stem} ({counter}){suffix}"
-                    counter += 1
-            
-            if src_path.is_dir():
-                shutil.copytree(source, dst_path)
-            else:
-                shutil.copy2(source, dst_path)
-            copied_files.append(str(dst_path))
+        try:
+            src_path = Path(source)
+            if src_path.exists():
+                dst_path = target_path / src_path.name
+                
+                # Auto rename if file exists
+                if dst_path.exists():
+                    stem = src_path.stem
+                    suffix = src_path.suffix
+                    counter = 1
+                    while dst_path.exists():
+                        dst_path = target_path / f"{stem} ({counter}){suffix}"
+                        counter += 1
+                
+                if src_path.is_dir():
+                    shutil.copytree(source, dst_path)
+                else:
+                    shutil.copy2(source, dst_path)
+                copied_files.append(str(dst_path))
+        except Exception as e:
+            print(f"Error copying {source}: {e}")
+            # Continue with other files
             
     return copied_files
 

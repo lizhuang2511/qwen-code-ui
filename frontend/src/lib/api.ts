@@ -185,6 +185,10 @@ export interface API {
   create_directory(params: { path: string }): Promise<boolean>;
   delete_path(params: { path: string }): Promise<boolean>;
   move_path(params: { oldPath: string; newPath: string }): Promise<boolean>;
+  set_clipboard_content(params: {
+    type: "files" | "text";
+    content: string[] | string;
+  }): Promise<boolean>;
   get_clipboard_content(): Promise<{
     type: "files" | "text" | "empty";
     content: string[] | string | null;

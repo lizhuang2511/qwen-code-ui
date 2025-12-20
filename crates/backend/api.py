@@ -10,6 +10,7 @@ import search
 import projects
 import session
 import webview
+import struct
 try:
     import win32clipboard
     import win32con
@@ -237,34 +238,41 @@ class Api:
         if not HAS_WIN32:
             return result
 
-        win32clipboard.OpenClipboard()
-        
-        # Check for file drop list (CF_HDROP)
-        if win32clipboard.IsClipboardFormatAvailable(win32con.CF_HDROP):
-            data = win32clipboard.GetClipboardData(win32con.CF_HDROP)
-            if data:
-                result = {"type": "files", "content": list(data)}
-        
-        # Check for text (CF_UNICODETEXT)
-        elif win32clipboard.IsClipboardFormatAvailable(win32con.CF_UNICODETEXT):
-            text = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
-            if text:
-                text = text.strip()
-                # Remove surrounding quotes if present (common when copying paths)
-                clean_text = text
-                if len(text) >= 2 and text.startswith('"') and text.endswith('"'):
-                    clean_text = text[1:-1]
-                elif len(text) >= 2 and text.startswith("'") and text.endswith("'"):
-                    clean_text = text[1:-1]
-                    
-                # Check if text is a valid path
-                if os.path.exists(clean_text):
-                    # Treat as file/folder path
-                    result = {"type": "files", "content": [clean_text]}
-                else:
-                    result = {"type": "text", "content": text}
-        
-        win32clipboard.CloseClipboard()
+        try:
+            win32clipboard.OpenClipboard()
+            
+            # Check for file drop list (CF_HDROP)
+            if win32clipboard.IsClipboardFormatAvailable(win32con.CF_HDROP):
+                data = win32clipboard.GetClipboardData(win32con.CF_HDROP)
+                if data:
+                    result = {"type": "files", "content": list(data)}
+            
+            # Check for text (CF_UNICODETEXT)
+            elif win32clipboard.IsClipboardFormatAvailable(win32con.CF_UNICODETEXT):
+                text = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
+                if text:
+                    text = text.strip()
+                    # Remove surrounding quotes if present (common when copying paths)
+                    clean_text = text
+                    if len(text) >= 2 and text.startswith('"') and text.endswith('"'):
+                        clean_text = text[1:-1]
+                    elif len(text) >= 2 and text.startswith("'") and text.endswith("'"):
+                        clean_text = text[1:-1]
+                        
+                    # Check if text is a valid path
+                    if os.path.exists(clean_text):
+                        # Treat as file/folder path
+                        result = {"type": "files", "content": [clean_text]}
+                    else:
+                        result = {"type": "text", "content": text}
+        except Exception as e:
+            print(f"Clipboard error: {e}")
+            return {"type": "error", "content": str(e)}
+        finally:
+            try:
+                win32clipboard.CloseClipboard()
+            except Exception:
+                pass
         
         return result
 
@@ -276,3 +284,53 @@ class Api:
 
     def move_path(self, params: Dict[str, Any]) -> bool:
         return filesystem.rename_path(params.get("oldPath", ""), params.get("newPath", ""))
+
+    def set_clipboard_content(self, params: Dict[str, Any]) -> bool:
+        content_type = params.get("type", "text")
+        content = params.get("content")
+
+        if not HAS_WIN32:
+            return False
+
+        try:
+            win32clipboard.OpenClipboard()
+            win32clipboard.EmptyClipboard()
+
+            if content_type == "text" and isinstance(content, str):
+                win32clipboard.SetClipboardData(win32con.CF_UNICODETEXT, content)
+            
+            elif content_type == "files" and isinstance(content, list):
+                # 构建 DROPFILES 结构的二进制数据
+                # struct DROPFILES { DWORD pFiles; POINT pt; BOOL fNC; BOOL fWide; }
+                # pFiles = 20 (offset)
+                # pt = {0, 0}
+                # fNC = 0
+                # fWide = 1
+                
+                # 20 bytes header
+                # I = unsigned int (4), l = long (4), but POINT is 2 longs (x, y)
+                # pFiles(4), pt.x(4), pt.y(4), fNC(4), fWide(4)
+                offset = 20
+                header = struct.pack("IiiII", offset, 0, 0, 0, 1)
+                
+                # Paths
+                paths_bytes = b""
+                for p in content:
+                    # 必须是绝对路径，且用反斜杠
+                    abs_path = os.path.abspath(p).replace("/", "\\")
+                    # encode utf-16le, append null char (2 bytes)
+                    paths_bytes += abs_path.encode("utf-16le") + b"\x00\x00"
+                paths_bytes += b"\x00\x00" # Double null terminator
+                
+                data = header + paths_bytes
+                win32clipboard.SetClipboardData(win32con.CF_HDROP, data)
+
+            win32clipboard.CloseClipboard()
+            return True
+        except Exception as e:
+            print(f"Set clipboard error: {e}")
+            try:
+                win32clipboard.CloseClipboard()
+            except:
+                pass
+            return False

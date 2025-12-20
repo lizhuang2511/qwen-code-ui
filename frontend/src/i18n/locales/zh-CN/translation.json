@@ -539,6 +539,7 @@
     "title": "目录",
     "noContent": "无目录内容",
     "openInFileManager": "在系统文件管理器中打开",
+    "openWithDefault": "用系统默认应用打开",
     "newFile": "新建文件",
     "newFolder": "新建文件夹",
     "paste": "粘贴",

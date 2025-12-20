@@ -100,6 +100,41 @@ export function DirectoryPanel({
     name: string;
   } | null>(null);
 
+  // Handle Cut/Copy (Internal + System)
+  const handleCutCopy = async (
+    node: TreeNode,
+    type: "cut" | "copy"
+  ) => {
+    // 1. Set internal clipboard (for app-internal moves/copies)
+    setInternalClipboard({
+      type,
+      path: node.full_path,
+      name: node.name,
+    });
+
+    // 2. Set system clipboard (for external pastes)
+    try {
+      await api.set_clipboard_content({
+        type: "files",
+        content: [node.full_path],
+      });
+      
+      const message = type === "cut" 
+        ? t("directoryPanel.cutToClipboard", "Cut to internal clipboard")
+        : t("directoryPanel.copyToClipboard", "Copied to clipboard");
+        
+      toast.success(message);
+    } catch (err) {
+      console.error("Failed to set system clipboard", err);
+      // Fallback message if system clipboard fails but internal succeeded
+      toast.success(
+        type === "cut"
+          ? t("directoryPanel.cutToClipboard", "Cut to internal clipboard")
+          : t("directoryPanel.copyToClipboard", "Copied to internal clipboard")
+      );
+    }
+  };
+
   // Calculate relative path from working directory
   const getRelativePath = useCallback(
     (fullPath: string) => {
@@ -359,7 +394,7 @@ export function DirectoryPanel({
         let safeName = text.slice(0, 10).replace(/[<>:"/\\|?*\x00-\x1F]/g, "_");
         safeName = safeName.trim();
         if (!safeName) safeName = "clipboard";
-        setPasteFilename(`${safeName}.txt`);
+        setPasteFilename(`${safeName}.md`);
         setPasteContent(text);
         setPasteTargetDir(targetDir);
         setPasteDialogOpen(true);
@@ -537,32 +572,12 @@ export function DirectoryPanel({
                       >
                         <Eye className="h-4 w-4" />
                       </button>
-                      <button
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          await api.open_with_default_app({ path: node.full_path });
-                        }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-muted rounded-md text-muted-foreground hover:text-foreground"
-                        title="Open with system default"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </button>
                     </>
                   )}
 
                   {/* Plus button for folders on hover */}
                   {node.is_directory && onMentionInsert && (
                     <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePaste(node.full_path);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground"
-                        title={t("directoryPanel.pasteInto", "Paste into folder")}
-                      >
-                        <Clipboard className="h-3 w-3" />
-                      </button>
                       <button
                         onClick={(e) => handleFolderPlusClick(node, e)}
                         className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground"
@@ -604,36 +619,33 @@ export function DirectoryPanel({
                     {t("directoryPanel.newFolder", "New Folder")}
                   </ContextMenuItem>
                   <ContextMenuSeparator />
-                  <ContextMenuItem
-                    onClick={() => handlePaste(node.full_path)}
-                  >
-                    <Clipboard className="mr-2 h-4 w-4" />
-                    {t("directoryPanel.paste", "Paste")}
-                  </ContextMenuItem>
                 </>
               )}
               <ContextMenuItem
-                onClick={() => {
-                  setInternalClipboard({
-                    type: "copy",
-                    path: node.full_path,
-                    name: node.name,
-                  });
-                  toast.success(t("directoryPanel.copyToClipboard", "Copied to internal clipboard"));
+                onClick={async () => {
+                  await api.open_with_default_app({ path: node.full_path });
                 }}
+              >
+                <ExternalLink className="mr-2 h-4 w-4" />
+                {t("directoryPanel.openWithDefault", "Open with Default App")}
+              </ContextMenuItem>
+              <ContextMenuItem
+                onClick={() => {
+                  const targetPath = node.is_directory ? node.full_path : getParentDir(node.full_path);
+                  handlePaste(targetPath);
+                }}
+              >
+                <Clipboard className="mr-2 h-4 w-4" />
+                {t("directoryPanel.paste", "Paste")}
+              </ContextMenuItem>
+              <ContextMenuItem
+                onClick={() => handleCutCopy(node, "copy")}
               >
                 <Copy className="mr-2 h-4 w-4" />
                 {t("directoryPanel.copy", "Copy")}
               </ContextMenuItem>
               <ContextMenuItem
-                onClick={() => {
-                  setInternalClipboard({
-                    type: "cut",
-                    path: node.full_path,
-                    name: node.name,
-                  });
-                  toast.success(t("directoryPanel.cutToClipboard", "Cut to internal clipboard"));
-                }}
+                onClick={() => handleCutCopy(node, "cut")}
               >
                 <Scissors className="mr-2 h-4 w-4" />
                 {t("directoryPanel.cut", "Cut")}

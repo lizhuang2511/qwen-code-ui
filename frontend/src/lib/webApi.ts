@@ -288,6 +288,20 @@ export const webApi: API = {
     }
     return { type: "empty", content: null };
   },
+
+  async set_clipboard_content(params) {
+    try {
+      if (params.type === "text" && typeof params.content === "string") {
+        await navigator.clipboard.writeText(params.content);
+        return true;
+      }
+      console.warn("Clipboard write failed: unsupported type or content for web mode");
+      return false;
+    } catch (e) {
+      console.warn("Clipboard write failed", e);
+      return false;
+    }
+  },
 };
 
 export interface RecentChat {
