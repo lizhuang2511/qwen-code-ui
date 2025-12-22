@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { FolderTree, Settings as SettingsIcon } from "lucide-react";
 import { SmartLogo } from "../branding/SmartLogo";
 import { DesktopText } from "../branding/DesktopText";
-import { PiebaldLogo } from "../branding/PiebaldLogo";
 import { SidebarTrigger } from "../ui/sidebar";
 import { Button } from "../ui/button";
 
@@ -70,7 +69,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           {/* Center section - Empty spacer */}
           <div className="flex-1"></div>
 
-          {/* Right section - Settings + Directory Toggle + Piebald branding */}
+          {/* Right section - Settings + Directory Toggle */}
           <div className="flex flex-1 items-center justify-end gap-2">
             {onOpenSettings && (
               <Button
@@ -93,9 +92,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 <FolderTree className="h-4 w-4" />
               </Button>
             )}
-            <div className="flex flex-col items-end text-xs text-neutral-400">
-              <p>{t("header.fromCreatorsOf")}</p> <PiebaldLogo />
-            </div>
           </div>
         </div>
       </div>

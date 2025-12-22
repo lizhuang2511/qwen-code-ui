@@ -121,6 +121,20 @@ def get_recent_chats() -> List[Dict]:
     chats.sort(key=lambda x: x["started_at_iso"], reverse=True)
     return chats
 
+def delete_conversation(chat_id: str) -> bool:
+    if not PROJECTS_DIR.exists():
+        return False
+        
+    for project_dir in PROJECTS_DIR.iterdir():
+        if not project_dir.is_dir():
+            continue
+        potential_path = project_dir / f"rpc-log-{chat_id}.log"
+        if potential_path.exists():
+            potential_path.unlink()
+            return True
+            
+    return False
+
 def search_chats(query: str, filters: Optional[Dict]) -> List[Dict]:
     if not PROJECTS_DIR.exists():
         return []

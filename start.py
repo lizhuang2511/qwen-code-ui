@@ -78,7 +78,14 @@ if __name__ == "__main__":
     
     atexit.register(cleanup, backend_process)
     
-    window = webview.create_window("QWENCODE", entry, js_api=Api(), text_select=True)
+    window = webview.create_window(
+        "QWENCODE", 
+        entry, 
+        js_api=Api(), 
+        text_select=True,
+        width=1400,
+        height=800
+    )
     
     def on_closing():
         # Prompt user to save conversation history

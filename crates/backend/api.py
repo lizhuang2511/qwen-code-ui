@@ -170,7 +170,9 @@ class Api:
         return search.get_detailed_conversation(params.get("chatId", ""))
 
     def delete_conversation(self, params: Dict[str, Any]) -> None:
-        return None
+        chat_id = params.get("chatId", "")
+        session.kill_process(chat_id)
+        search.delete_conversation(chat_id)
 
     def get_canonical_path(self, params: Dict[str, Any]) -> str:
         return os.path.abspath(params.get("path", ""))
@@ -224,9 +226,9 @@ class Api:
     def open_with_default_app(self, params: Dict[str, Any]) -> None:
         path = params.get("path", "")
         if os.path.exists(path):
-            if os.name == 'nt':
+            if sys.platform == 'win32':
                 os.startfile(path)
-            elif os.name == 'posix':
+            elif sys.platform == 'darwin':
                 subprocess.call(('open', path))
             else:
                 subprocess.call(('xdg-open', path))

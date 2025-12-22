@@ -128,6 +128,22 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({
             </ReactMarkdown>
           </div>
 
+          <div className="text-center text-sm text-muted-foreground pt-2 space-y-1">
+             <p>
+               由 尘世种莲花 基于{" "}
+               <a
+                 href="https://github.com/Piebald-AI/gemini-cli-desktop"
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 className="text-primary hover:underline"
+               >
+                 Piebald 的项目
+               </a>{" "}
+               修改而来
+             </p>
+             <p>联系方式: 2460162254@qq.com</p>
+          </div>
+
           <div className="pt-4 border-t border-border">
             <DialogDescription className="text-center text-xs text-muted-foreground">
               {t("about.copyright", { year: currentYear, appName })}

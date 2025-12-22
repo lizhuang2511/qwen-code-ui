@@ -1,7 +1,6 @@
 import React from "react";
 import { SmartLogo } from "../branding/SmartLogo";
 import { DesktopText } from "../branding/DesktopText";
-import { PiebaldLogo } from "../branding/PiebaldLogo";
 
 type PageLayoutProps = {
   children: React.ReactNode;
@@ -25,10 +24,8 @@ export function PageLayout({ children }: PageLayoutProps) {
               <DesktopText size="small" />
             </div>
 
-            {/* Right section - Piebald branding */}
-            <div className="flex flex-1 flex-col items-end text-xs text-neutral-400">
-              <p>From the creators of</p> <PiebaldLogo />
-            </div>
+            {/* Right section - Empty to maintain layout balance if needed, or just remove */}
+             <div className="flex flex-1"></div>
           </div>
         </div>
       </div>

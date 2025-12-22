@@ -111,6 +111,18 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
     def read_stdout():
         total = 0
         log_buffer = []
+        ui_buffer = []
+        last_emit_time = 0
+
+        def flush_ui_buffer():
+            nonlocal ui_buffer, last_emit_time
+            if not ui_buffer:
+                return
+            full_text = "".join(ui_buffer)
+            events.emit(f"ai-output-{session_id}", full_text)
+            ui_buffer.clear()
+            last_emit_time = time.time()
+
         def flush_log_buffer():
             nonlocal log_buffer
             if not log_buffer:
@@ -141,6 +153,7 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                     status = parsed.get("status")
                     # print(f"[SESSION-PARSE] status={status}") # Debug parsed status
                     if status == "permission_request":
+                        flush_ui_buffer()
                         flush_log_buffer()
                         data = parsed.get("content")
                         raw_data = parsed.get("raw", "")
@@ -173,6 +186,7 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                         continue
 
                     if status == "tool_call_update":
+                        flush_ui_buffer()
                         data = parsed.get("content") or {}
                         params = data.get("params") or {}
                         update = params.get("update") or {}
@@ -227,6 +241,7 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                         continue
 
                     if status == "turn_finished":
+                        flush_ui_buffer()
                         flush_log_buffer()
                         stop_reason = (parsed.get("content") or {}).get("stopReason")
                         print(f"[SESSION] Turn finished: {stop_reason}")
@@ -244,6 +259,7 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                         continue
 
                     if status == "error":
+                        flush_ui_buffer()
                         flush_log_buffer()
                         error_data = (parsed.get("content") or {}).get("error")
                         print(f"[SESSION] Protocol Error: {error_data}")
@@ -263,7 +279,10 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                     cli_data = raw_data if raw_data else content
                     events.emit(f"cli-io-{session_id}", {"type": "output", "data": cli_data})
                     if content:
-                        events.emit(f"ai-output-{session_id}", content)
+                        ui_buffer.append(content)
+                        if time.time() - last_emit_time > 0.1:
+                            flush_ui_buffer()
+                        
                         # Buffer assistant message chunk for logging
                         log_buffer.append(content)
                         if len("".join(log_buffer)) > 100:
@@ -273,6 +292,7 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
             if total >= STREAM_LIMIT_BYTES:
                 events.emit(f"cli-io-{session_id}", {"type": "output", "data": "[limit] output truncated"})
                 break
+        flush_ui_buffer()
     def read_stderr():
         total = 0
         for line in proc.stderr:
