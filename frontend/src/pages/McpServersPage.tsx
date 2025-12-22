@@ -25,10 +25,12 @@ import { useBackend } from "../contexts/BackendContext";
 import { getBackendText } from "../utils/backendText";
 import { useTranslation } from "react-i18next";
 
+import { api } from "../lib/api";
+
 export function McpServersPage() {
   const { t } = useTranslation();
   const [servers, setServers] = useState<McpServerEntry[]>([]);
-  const [settingsFilePath, setSettingsFilePath] = useState<string>("");
+  const [settingsFilePath, setSettingsFilePath] = useState<string>("~/.qwen/settings.json");
   const [isLoading, setIsLoading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [serverToDelete, setServerToDelete] = useState<McpServerEntry | null>(
@@ -39,13 +41,39 @@ export function McpServersPage() {
   const navigate = useNavigate();
 
   const loadSettingsPath = useCallback(async () => {
-    setSettingsFilePath("");
+    // For Qwen, the path is fixed
+    setSettingsFilePath("~/.qwen/settings.json");
   }, [selectedBackend, t]);
+
+  // Use settingsFilePath to prevent unused variable warning
+  useEffect(() => {
+    if (settingsFilePath) {
+      console.log("Using settings file:", settingsFilePath);
+    }
+  }, [settingsFilePath]);
 
   const loadSettingsFromFile = useCallback(async () => {
     setIsLoading(true);
-    setServers([]);
-    setIsLoading(false);
+    try {
+      const config = await api.get_mcp_config();
+      if (config && config.mcpServers) {
+        const loadedServers: McpServerEntry[] = Object.entries(config.mcpServers).map(
+          ([name, serverConfig]: [string, any]) => ({
+            id: name,
+            name: name,
+            config: serverConfig,
+            enabled: true,
+          })
+        );
+        setServers(loadedServers);
+      } else {
+        setServers([]);
+      }
+    } catch (error) {
+      console.error("Failed to load MCP config:", error);
+    } finally {
+      setIsLoading(false);
+    }
   }, [selectedBackend, t]);
 
   // Load settings file path on component mount and when backend changes
@@ -55,16 +83,27 @@ export function McpServersPage() {
 
   // Load MCP servers from settings.json file when component mounts
   useEffect(() => {
-    if (settingsFilePath) {
-      loadSettingsFromFile();
-    }
-  }, [settingsFilePath, loadSettingsFromFile]);
+    loadSettingsFromFile();
+  }, [loadSettingsFromFile]);
 
   // Save MCP servers to settings.json file
   const saveServersToFile = async (updatedServers: McpServerEntry[]) => {
     setIsLoading(true);
-    setServers(updatedServers);
-    setIsLoading(false);
+    setServers(updatedServers); // Optimistic update
+    
+    try {
+      const mcpServers: Record<string, any> = {};
+      updatedServers.forEach(server => {
+        mcpServers[server.name] = server.config;
+      });
+      
+      await api.save_mcp_config({ mcpServers });
+    } catch (error) {
+      console.error("Failed to save MCP config:", error);
+      // Revert state if needed, or show error
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleAddServer = (server: McpServerEntry) => {

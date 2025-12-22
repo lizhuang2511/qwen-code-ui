@@ -1,5 +1,6 @@
 from typing import Optional, Dict, Any, List
 import os
+import json
 import subprocess
 import shutil
 import shlex
@@ -11,6 +12,7 @@ import projects
 import session
 import webview
 import struct
+import sys
 try:
     import win32clipboard
     import win32con
@@ -334,3 +336,49 @@ class Api:
             except:
                 pass
             return False
+
+    def get_mcp_config(self) -> Dict[str, Any]:
+        path = os.path.expanduser("~/.qwen/settings.json")
+        if os.path.exists(path):
+            # Validate JSON using subprocess to avoid try-except in Python
+            # python -m json.tool < path > /dev/null
+            is_valid = False
+            if os.path.getsize(path) > 0:
+                # Use sys.executable to ensure we use the same python interpreter
+                run_args = [sys.executable, "-m", "json.tool", path]
+                result = subprocess.run(run_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if result.returncode == 0:
+                    is_valid = True
+            
+            if is_valid:
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    data = json.loads(content)
+                    if isinstance(data, dict):
+                        return data
+        return {"mcpServers": {}}
+
+    def save_mcp_config(self, params: Dict[str, Any]) -> bool:
+        path = os.path.expanduser("~/.qwen/settings.json")
+        directory = os.path.dirname(path)
+        
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+            
+        current_config = {}
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+                if content.strip():
+                    current_config = json.loads(content)
+        
+        if not isinstance(current_config, dict):
+            current_config = {}
+            
+        mcp_servers = params.get("mcpServers", {})
+        current_config["mcpServers"] = mcp_servers
+        
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(current_config, f, indent=2, ensure_ascii=False)
+            
+        return True

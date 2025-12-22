@@ -302,6 +302,16 @@ export const webApi: API = {
       return false;
     }
   },
+
+  async get_mcp_config() {
+    const response = await apiClient.get<any>("/get-mcp-config");
+    return response.data;
+  },
+
+  async save_mcp_config(params) {
+    const response = await apiClient.post<boolean>("/save-mcp-config", params);
+    return response.data;
+  },
 };
 
 export interface RecentChat {

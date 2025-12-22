@@ -193,6 +193,8 @@ export interface API {
     type: "files" | "text" | "empty";
     content: string[] | string | null;
   }>;
+  get_mcp_config(): Promise<any>;
+  save_mcp_config(params: any): Promise<boolean>;
 }
 
 export type APICommand = keyof API;
