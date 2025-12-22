@@ -8,6 +8,7 @@ from typing import Dict, Optional, List, Any
 from pathlib import Path
 from datetime import datetime
 import events
+import projects
 from cli_runner import build_client, build_command, resolve_executable, STREAM_LIMIT_BYTES, LINE_LIMIT_BYTES
 from parsers import parse_qwen_line
 from qwen_adapter import QwenProcess
@@ -335,6 +336,10 @@ def _process_queued_messages(session_id: str):
 def start_session(session_id: str, working_directory: Optional[str], model: Optional[str], backend: Optional[str] = None, backend_config: Optional[Dict] = None) -> None:
     wd = working_directory or "."
     mdl = model or ""
+    
+    # Resolve project ID
+    project_id = projects.ensure_project(wd)
+    
     _emit_progress(session_id, "starting", "Starting session initialization", 5, wd if wd else None)
     
     # Initialize session state early with ready=False and empty queue
@@ -352,7 +357,7 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
         "title": "New Conversation",
         "started_at_iso": datetime.utcnow().isoformat() + "Z",
         "current_assistant_message": "",
-        "logger": RpcLogger(session_id)
+        "logger": RpcLogger(session_id, project_id)
     }
     
     # Initialize logger

@@ -1,6 +1,8 @@
 from typing import List, Dict
 from pathlib import Path
 import json
+import hashlib
+import os
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = BASE_DIR / "data"
@@ -10,6 +12,22 @@ def _ensure_data_dir():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     if not PROJECTS_FILE.exists():
         PROJECTS_FILE.write_text(json.dumps({"items": []}, ensure_ascii=False), encoding="utf-8")
+
+def hash_path(path: str) -> str:
+    abs_path = os.path.abspath(path)
+    return hashlib.sha256(abs_path.encode("utf-8")).hexdigest()
+
+def ensure_project(path: str) -> str:
+    pid = hash_path(path)
+    title = os.path.basename(path) or path
+    upsert_project(pid, path, title)
+    
+    # Ensure directory exists (like Rust)
+    project_dir = DATA_DIR / "projects" / pid
+    if not project_dir.exists():
+        project_dir.mkdir(parents=True, exist_ok=True)
+        
+    return pid
 
 def list_projects(limit: int, offset: int) -> Dict:
     _ensure_data_dir()
