@@ -145,10 +145,10 @@ tr[class*="code-fold"] a,
   body {
     @apply bg-background text-foreground;
     font-family:
-      "Figtree",
-      -apple-system,
-      BlinkMacSystemFont,
       "Segoe UI",
+      "Roboto",
+      "Helvetica Neue",
+      Arial,
       sans-serif;
     font-display: swap;
   }

@@ -49,10 +49,13 @@ def start_ticker():
                 return
             w = webview.windows[0]
             payload = {"time": int(threading.get_native_id())}
-            w.evaluate_js(
-                'window.dispatchEvent(new CustomEvent("ticker",{detail:%s}))'
-                % json.dumps(payload)
-            )
+            try:
+                w.evaluate_js(
+                    'window.dispatchEvent(new CustomEvent("ticker",{detail:%s}))'
+                    % json.dumps(payload)
+                )
+            except Exception:
+                pass
             threading.Event().wait(1.0)
 
     t = threading.Thread(target=loop, daemon=True)

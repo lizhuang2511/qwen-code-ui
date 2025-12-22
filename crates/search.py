@@ -39,10 +39,46 @@ def _read_log_file(log_path: Path) -> List[Dict[str, Any]]:
         print(f"Error reading log file {log_path}: {e}")
     return lines
 
+def _scan_log_header(log_path: Path) -> tuple[str, int]:
+    """
+    Lightweight scan of log file to get title and message count without full parsing.
+    """
+    title = "Chat Session"
+    count = 0
+    
+    try:
+        # 1. Quick title scan (first 4KB or 50 lines)
+        with open(log_path, "r", encoding="utf-8") as f:
+            for i, line in enumerate(f):
+                if i > 50: break
+                if "session/prompt" in line:
+                    try:
+                        data = json.loads(line)
+                        if data.get("method") == "session/prompt":
+                            prompt = data.get("params", {}).get("prompt", [])
+                            for part in prompt:
+                                if part.get("type") == "text":
+                                    text = part.get("text", "")
+                                    if text:
+                                        title = text[:50] + "..." if len(text) > 50 else text
+                                        break
+                            if title != "Chat Session": break
+                    except: pass
+    except: pass
+
+    # 2. Fast line counting (approximate message count)
+    try:
+        # Only count for files < 5MB to avoid IO blocking
+        if log_path.stat().st_size < 5 * 1024 * 1024:
+            with open(log_path, "rb") as f:
+                count = sum(1 for _ in f)
+    except: pass
+    
+    return title, count
+
 def get_recent_chats() -> List[Dict]:
-    print(f"[Search] Scanning projects dir for chats: {PROJECTS_DIR}")
+    # print(f"[Search] Scanning projects dir for chats: {PROJECTS_DIR}")
     if not PROJECTS_DIR.exists():
-        print(f"[Search] Projects dir does not exist: {PROJECTS_DIR}")
         return []
     
     chats = []
@@ -55,58 +91,32 @@ def get_recent_chats() -> List[Dict]:
         # Scan logs in this project dir
         for entry in project_dir.iterdir():
             if entry.is_file() and entry.name.startswith("rpc-log-") and entry.name.endswith(".log"):
-                # print(f"[Search] Found log file: {entry.name} in {project_dir.name}")
-                log_content = _read_log_file(entry)
-                if not log_content:
-                    # print(f"[Search] Log file empty or invalid: {entry.name}")
-                    continue
-                    
-                # Extract info from logs
-                title = "Chat Session"
+                # Optimize: Get timestamp from filename first
                 started_at_iso = ""
-                message_count = 0
+                ts = _parse_timestamp_from_filename(entry.name)
+                if ts:
+                    try:
+                        # Convert to ISO format
+                        started_at_iso = datetime.utcfromtimestamp(ts / 1000.0 if ts > 1e11 else ts).isoformat() + "Z"
+                    except: pass
                 
-                # Try to find first user message for title
-                for item in log_content:
-                    method = item.get("method")
-                    timestamp = item.get("timestamp")
-                    
-                    if not started_at_iso and timestamp:
-                        started_at_iso = timestamp
-                    
-                    if method == "session/prompt":
-                        message_count += 1
-                        params = item.get("params", {})
-                        prompt = params.get("prompt", [])
-                        if prompt and isinstance(prompt, list):
-                            for part in prompt:
-                                if part.get("type") == "text":
-                                    text = part.get("text", "")
-                                    if text:
-                                        if title == "Chat Session":
-                                            title = text[:50] + "..." if len(text) > 50 else text
-                                        break
-                    
-                    # Count assistant turns
-                    if "result" in item and "stopReason" in item["result"]:
-                        message_count += 1
-
                 if not started_at_iso:
-                    # Fallback to file creation time
                     try:
                         started_at_iso = datetime.fromtimestamp(entry.stat().st_ctime).isoformat() + "Z"
-                    except Exception as e:
-                        print(f"[Search] Error getting file time for {entry.name}: {e}")
+                    except: pass
 
+                # Lightweight scan instead of full read
+                title, message_count = _scan_log_header(entry)
+                
                 chats.append({
                     "id": entry.name.replace("rpc-log-", "").replace(".log", ""),
                     "title": title,
                     "started_at_iso": started_at_iso,
                     "message_count": message_count,
-                    "project_id": project_dir.name # Include project ID for context
+                    "project_id": project_dir.name
                 })
     
-    print(f"[Search] Found {len(chats)} chats across all projects")
+    # print(f"[Search] Found {len(chats)} chats across all projects")
     # Sort by started_at desc
     chats.sort(key=lambda x: x["started_at_iso"], reverse=True)
     return chats
