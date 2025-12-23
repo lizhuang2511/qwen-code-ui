@@ -132,7 +132,16 @@ def start_ticker(icon_path=None):
                             try:
                                 # For pywebview with pythonnet (WinForms)
                                 if hasattr(w.native, 'Handle'):
-                                    hwnd = int(w.native.Handle)
+                                    # Handle is a System.IntPtr
+                                    # Check if it has ToInt64 method (standard IntPtr)
+                                    if hasattr(w.native.Handle, 'ToInt64'):
+                                        hwnd = w.native.Handle.ToInt64()
+                                    elif hasattr(w.native.Handle, 'ToInt32'):
+                                        hwnd = w.native.Handle.ToInt32()
+                                    else:
+                                        # Fallback to int() if possible, though previous error suggests not
+                                        hwnd = int(w.native.Handle)
+                                    
                                     print(f"[Icon] Found HWND via webview.native: {hwnd}")
                                     break
                             except Exception as e:
@@ -184,7 +193,7 @@ if __name__ == "__main__":
     
     icon_path = get_icon_path()
     window = webview.create_window(
-        "QWENCODE", 
+        "QWENCODE DESKTOP", 
         entry, 
         js_api=Api(), 
         text_select=True,

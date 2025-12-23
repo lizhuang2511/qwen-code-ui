@@ -32,7 +32,7 @@ export const getBackendText = (backend: BackendType) => {
     backend === "llxprt"
       ? "LLxprt Desktop"
       : backend === "qwen"
-        ? "qwencodecli Desktop"
+        ? "Qwen CLI Desktop"
         : t("backend.geminiCliDesktop");
   const backendShortname =
     backend === "llxprt" ? "LLxprt" : t(`backend.${backend}`);

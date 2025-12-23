@@ -820,6 +820,7 @@ export {
   SidebarMenuSubItem,
   SidebarProvider,
   SidebarRail,
+  SidebarResizeHandle,
   SidebarSeparator,
   SidebarTrigger,
   // eslint-disable-next-line react-refresh/only-export-components

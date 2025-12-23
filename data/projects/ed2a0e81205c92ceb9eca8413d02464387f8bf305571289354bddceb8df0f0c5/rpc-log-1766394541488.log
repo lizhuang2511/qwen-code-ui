@@ -1,0 +1,2 @@
+{"method": "session/prompt", "params": {"prompt": [{"type": "text", "text": "niahi"}]}, "timestamp": "2025-12-22T09:09:20.878659Z"}
+{"method": "session/update", "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "你好！看起来你输入了“niahi”，这可能是中文问候语的拼音。如果你有任何问题或需要帮助，随时告诉我。我可以协助你处理代码、解答技术问题或提供其他支持。\n\n根据我看到的项目结构，这是一个关于齿轮箱（gearbox"}}}, "timestamp": "2025-12-22T09:09:26.275438Z"}

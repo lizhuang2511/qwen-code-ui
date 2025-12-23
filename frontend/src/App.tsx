@@ -17,7 +17,8 @@ import { AppHeader } from "./components/layout/AppHeader";
 import { ConversationSearchDialog } from "./components/conversation/ConversationSearchDialog";
 import { CustomTitleBar } from "./components/layout/CustomTitleBar";
 import { DirectoryPanel } from "./components/common/DirectoryPanel";
-import { SidebarInset } from "./components/ui/sidebar";
+import { GitPanel } from "./components/git/GitPanel";
+import { SidebarInset, SidebarResizeHandle } from "./components/ui/sidebar";
 import { Toaster } from "./components/ui/sonner";
 import { ConversationContext } from "./contexts/ConversationContext";
 import {
@@ -39,6 +40,7 @@ import { useToolCallConfirmation } from "./hooks/useToolCallConfirmation";
 import { useConversationEvents } from "./hooks/useConversationEvents";
 import { useCliInstallation } from "./hooks/useCliInstallation";
 import { useSessionProgress } from "./hooks/useSessionProgress";
+import { useResizable } from "./hooks/useResizable";
 import { CliIO, Conversation, Message } from "./types";
 import "./index.css";
 import { getPlatform } from "./lib/runtime";
@@ -49,6 +51,18 @@ import { ErrorBoundary } from "./components/common/ErrorBoundary";
 function RootLayoutContent() {
   const { progress, startListeningForSession, seedProgress } =
     useSessionProgress();
+
+  const {
+    width: directoryPanelWidth,
+    isResizing: isDirectoryPanelResizing,
+    handleMouseDown: handleDirectoryPanelResizeStart,
+  } = useResizable({
+    defaultWidth: 320,
+    minWidth: 200,
+    maxWidth: 600,
+    storageKey: "directory-panel-width",
+    reverse: true,
+  });
 
   // Get current route to conditionally render MessageInputBar only on home page
   const location = useLocation();
@@ -62,7 +76,10 @@ function RootLayoutContent() {
   const [cliIOLogs, setCliIOLogs] = useState<CliIO[]>([]);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [directoryPanelOpen, setDirectoryPanelOpen] = useState(false);
+  
+  // Right panel state: 'none' | 'directory' | 'git'
+  const [activeRightPanel, setActiveRightPanel] = useState<"none" | "directory" | "git">("none");
+  
   const [searchOpen, setSearchOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [workingDirectory, setWorkingDirectory] = useState<string>(".");
@@ -404,15 +421,19 @@ function RootLayoutContent() {
   );
 
   const toggleDirectoryPanel = useCallback(() => {
-    setDirectoryPanelOpen((prev) => !prev);
+    setActiveRightPanel((prev) => (prev === "directory" ? "none" : "directory"));
   }, []);
 
-  // Auto-close directory panel when active conversation ends, unless we are on project detail page
+  const toggleGitPanel = useCallback(() => {
+    setActiveRightPanel((prev) => (prev === "git" ? "none" : "git"));
+  }, []);
+
+  // Auto-close right panel when active conversation ends, unless we are on project detail page
   useEffect(() => {
-    if (!activeConversation && !isProjectDetailPage && directoryPanelOpen) {
-      setDirectoryPanelOpen(false);
+    if (!activeConversation && !isProjectDetailPage && activeRightPanel !== "none") {
+      setActiveRightPanel("none");
     }
-  }, [activeConversation, isProjectDetailPage, directoryPanelOpen]);
+  }, [activeConversation, isProjectDetailPage, activeRightPanel]);
 
   const handleContinueConversation = useCallback(
     async (conversationToContinue: Conversation) => {
@@ -534,9 +555,9 @@ function RootLayoutContent() {
             style={{
               gridTemplateRows: "auto 1fr",
               gridTemplateColumns:
-                directoryPanelOpen &&
+                activeRightPanel !== "none" &&
                 (activeConversation || isProjectDetailPage)
-                  ? "1fr 20rem"
+                  ? `1fr ${directoryPanelWidth}px`
                   : "1fr",
             }}
           >
@@ -544,7 +565,9 @@ function RootLayoutContent() {
             <div className="row-start-1 col-span-full">
               <AppHeader
                 onDirectoryPanelToggle={toggleDirectoryPanel}
-                isDirectoryPanelOpen={directoryPanelOpen}
+                isDirectoryPanelOpen={activeRightPanel === "directory"}
+                onGitPanelToggle={toggleGitPanel}
+                isGitPanelOpen={activeRightPanel === "git"}
                 hasActiveConversation={!!activeConversation}
                 showDirectoryButton={
                   !!activeConversation || isProjectDetailPage
@@ -588,19 +611,32 @@ function RootLayoutContent() {
               )}
             </div>
 
-            {/* Right directory panel */}
-            {directoryPanelOpen &&
+            {/* Right panel (Directory or Git) */}
+            {activeRightPanel !== "none" &&
               (activeConversation || isProjectDetailPage) && (
-                <div className="row-start-2 col-start-2 border-l min-h-0">
-                  <DirectoryPanel
-                    workingDirectory={workingDirectory}
-                    onDirectoryChange={(path) => {
-                      console.log("📁 [App] Directory changed to:", path);
-                    }}
-                    onMentionInsert={handleMentionInsert}
-                    onNewConversation={handleNewConversationFromDirectory}
-                    className="w-[20rem] h-full"
+                <div className="row-start-2 col-start-2 min-h-0 relative">
+                  <SidebarResizeHandle
+                    onMouseDown={handleDirectoryPanelResizeStart}
+                    isResizing={isDirectoryPanelResizing}
+                    side="right"
                   />
+                  {activeRightPanel === "directory" && (
+                    <DirectoryPanel
+                      workingDirectory={workingDirectory}
+                      onDirectoryChange={(path) => {
+                        console.log("📁 [App] Directory changed to:", path);
+                      }}
+                      onMentionInsert={handleMentionInsert}
+                      onNewConversation={handleNewConversationFromDirectory}
+                      className="w-full h-full"
+                    />
+                  )}
+                  {activeRightPanel === "git" && (
+                    <GitPanel
+                      workingDirectory={workingDirectory}
+                      className="w-full h-full"
+                    />
+                  )}
                 </div>
               )}
           </div>

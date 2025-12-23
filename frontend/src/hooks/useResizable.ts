@@ -6,6 +6,7 @@ interface UseResizableOptions {
   maxWidth?: number;
   storageKey?: string;
   onResize?: (width: number) => void;
+  reverse?: boolean;
 }
 
 export function useResizable({
@@ -14,6 +15,7 @@ export function useResizable({
   maxWidth = 600,
   storageKey = "sidebar-width",
   onResize,
+  reverse = false,
 }: UseResizableOptions = {}) {
   const [width, setWidth] = useState<number>(() => {
     if (typeof window !== "undefined" && storageKey) {
@@ -50,15 +52,16 @@ export function useResizable({
       if (!isResizing) return;
 
       const deltaX = e.clientX - startXRef.current;
+      const effectiveDelta = reverse ? -deltaX : deltaX;
       const newWidth = Math.min(
         maxWidth,
-        Math.max(minWidth, startWidthRef.current + deltaX)
+        Math.max(minWidth, startWidthRef.current + effectiveDelta)
       );
 
       setWidth(newWidth);
       onResize?.(newWidth);
     },
-    [isResizing, minWidth, maxWidth, onResize]
+    [isResizing, minWidth, maxWidth, onResize, reverse]
   );
 
   const handleMouseUp = useCallback(() => {

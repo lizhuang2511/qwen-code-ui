@@ -139,13 +139,28 @@ export interface API {
   }): Promise<EnrichedProject>;
   delete_project(params: { projectId: string }): Promise<void>;
   get_git_info(params: { path: string }): Promise<{
-    current_directory: string;
-    branch: string;
-    status: string;
-    is_clean: boolean;
-    has_uncommitted_changes: boolean;
-    has_untracked_files: boolean;
+    is_repo: boolean;
+    current_branch?: string;
+    staged?: { path: string; change_type: string }[];
+    unstaged?: { path: string; change_type: string }[];
+    untracked?: string[];
+    error?: string;
   } | null>;
+  git_init(params: { path: string }): Promise<boolean>;
+  git_commit(params: { path: string; message: string }): Promise<boolean>;
+  git_log(params: { path: string; limit?: number }): Promise<{
+    hexsha: string;
+    message: string;
+    author_name: string;
+    author_email: string;
+    date: string;
+    summary: string;
+  }[]>;
+  git_reset(params: {
+    path: string;
+    commitHash: string;
+    mode?: "soft" | "mixed" | "hard";
+  }): Promise<boolean>;
   read_file_content(params: { path: string }): Promise<{
     path: string;
     content: string | null;

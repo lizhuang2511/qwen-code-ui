@@ -124,6 +124,26 @@ export const webApi: API = {
     return response.data;
   },
 
+  async git_log(params) {
+    const response = await apiClient.post("/git-log", params);
+    return response.data;
+  },
+
+  async git_reset(params) {
+    const response = await apiClient.post("/git-reset", params);
+    return response.data;
+  },
+
+  async git_init(params) {
+    const response = await apiClient.post("/git-init", params);
+    return response.data;
+  },
+
+  async git_commit(params) {
+    const response = await apiClient.post("/git-commit", params);
+    return response.data;
+  },
+
   // Fetch recent chats for web mode via REST endpoint
   async get_recent_chats() {
     const response = await apiClient.get<RecentChat[]>("/recent-chats");

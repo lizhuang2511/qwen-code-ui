@@ -13,6 +13,7 @@ import session
 import webview
 import struct
 import sys
+import backend.git_utils as git_utils
 try:
     import win32clipboard
     import win32con
@@ -158,7 +159,22 @@ class Api:
         projects.delete_project(params.get("projectId", ""))
 
     def get_git_info(self, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        return None
+        path = params.get("path", "")
+        if not path:
+            return None
+        return git_utils.get_status(path)
+
+    def git_init(self, params: Dict[str, Any]) -> bool:
+        return git_utils.init_repo(params.get("path", ""))
+
+    def git_commit(self, params: Dict[str, Any]) -> bool:
+        return git_utils.commit(params.get("path", ""), params.get("message", ""))
+
+    def git_log(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+        return git_utils.get_log(params.get("path", ""), params.get("limit", 20))
+
+    def git_reset(self, params: Dict[str, Any]) -> bool:
+        return git_utils.reset(params.get("path", ""), params.get("commitHash", ""), params.get("mode", "mixed"))
 
     def read_file_content(self, params: Dict[str, Any]) -> Dict[str, Any]:
         return filesystem.read_file_content(params.get("path", ""))

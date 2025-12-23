@@ -95,6 +95,26 @@ export function GitInfo({
         <CardContent className="p-3">
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <div className="flex flex-col gap-1">
+              <span className="font-medium">Checking git info...</span>
+              <span className="text-xs opacity-75 truncate" title={directory}>
+                {directory}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!gitInfo.is_repo) {
+    if (compact) {
+      return null; // Don't show anything for non-git repos in compact mode
+    }
+    return (
+      <Card className={`border-l-4 border-l-gray-300 ${className}`}>
+        <CardContent className="p-3">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="flex flex-col gap-1">
               <span className="font-medium">Not a git repository</span>
               <span className="text-xs opacity-75 truncate" title={directory}>
                 {directory}
@@ -106,21 +126,25 @@ export function GitInfo({
     );
   }
 
+  const isClean = !gitInfo.staged?.length && !gitInfo.unstaged?.length && !gitInfo.untracked?.length;
+  const hasChanges = (gitInfo.staged?.length || 0) > 0 || (gitInfo.unstaged?.length || 0) > 0;
+  const hasUntracked = (gitInfo.untracked?.length || 0) > 0;
+
   const getBorderColor = () => {
-    if (gitInfo.is_clean) return "border-l-green-400";
-    if (gitInfo.has_uncommitted_changes) return "border-l-yellow-400";
-    if (gitInfo.has_untracked_files) return "border-l-blue-400";
+    if (isClean) return "border-l-green-400";
+    if (hasChanges) return "border-l-yellow-400";
+    if (hasUntracked) return "border-l-blue-400";
     return "border-l-gray-400";
   };
 
   const getStatusIcon = () => {
-    if (gitInfo.is_clean)
+    if (isClean)
       return <CheckCircle className="h-4 w-4 text-green-600" />;
     return <AlertCircle className="h-4 w-4 text-yellow-600" />;
   };
 
   const getStatusBadge = () => {
-    if (gitInfo.is_clean) {
+    if (isClean) {
       return (
         <Badge variant="outline" className="text-green-600 border-green-300">
           clean
@@ -129,10 +153,10 @@ export function GitInfo({
     }
 
     const statusItems = [];
-    if (gitInfo.has_uncommitted_changes) {
+    if (hasChanges) {
       statusItems.push("modified");
     }
-    if (gitInfo.has_untracked_files) {
+    if (hasUntracked) {
       statusItems.push("untracked");
     }
 
@@ -146,19 +170,19 @@ export function GitInfo({
   // Compact version - just show branch and a tiny status dot
   if (compact) {
     const getStatusColor = () => {
-      if (gitInfo.is_clean) return "text-green-500";
-      if (gitInfo.has_uncommitted_changes) return "text-yellow-500";
-      if (gitInfo.has_untracked_files) return "text-blue-500";
+      if (isClean) return "text-green-500";
+      if (hasChanges) return "text-yellow-500";
+      if (hasUntracked) return "text-blue-500";
       return "text-gray-500";
     };
 
     return (
       <div
         className={`flex items-center gap-1 text-xs text-gray-600 ${className}`}
-        title={`${gitInfo.current_directory} - ${gitInfo.status}`}
+        title={`${gitInfo.current_branch}`}
       >
         <GitBranch className="h-3 w-3 text-gray-500" />
-        <span className="font-mono truncate max-w-24">{gitInfo.branch}</span>
+        <span className="font-mono truncate max-w-24">{gitInfo.current_branch}</span>
         <div
           className={`w-1.5 h-1.5 rounded-full ${getStatusColor().replace("text-", "bg-")}`}
         />
@@ -175,11 +199,11 @@ export function GitInfo({
             <FolderOpen className="h-4 w-4 text-gray-500" />
             <span
               className="font-medium truncate"
-              title={gitInfo.current_directory}
+              title={directory}
             >
-              {gitInfo.current_directory.split("/").pop() ||
-                gitInfo.current_directory.split("\\").pop() ||
-                gitInfo.current_directory}
+              {directory.split("/").pop() ||
+                directory.split("\\").pop() ||
+                directory}
             </span>
           </div>
 
@@ -189,9 +213,9 @@ export function GitInfo({
               <GitBranch className="h-4 w-4 text-gray-500 flex-shrink-0" />
               <span
                 className="text-sm font-mono truncate"
-                title={gitInfo.branch}
+                title={gitInfo.current_branch}
               >
-                {gitInfo.branch}
+                {gitInfo.current_branch}
               </span>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
