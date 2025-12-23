@@ -145,3 +145,16 @@ def reset(path: str, commit_hash: str, mode: str = "mixed") -> bool:
     except Exception as e:
         print(f"Error resetting: {e}")
         return False
+
+def restore(path: str, commit_hash: Optional[str] = None) -> bool:
+    repo = get_repo(path)
+    if not repo:
+        return False
+    
+    if commit_hash:
+        repo.git.reset("--hard", commit_hash)
+    else:
+        repo.git.reset("--hard")
+        
+    repo.git.clean("-ffdx")
+    return True

@@ -16,7 +16,6 @@ import {
   FolderPlus,
   Move,
   Scissors,
-  MessageSquarePlus,
   FilePlus,
 } from "lucide-react";
 import { Button } from "../ui/button";
@@ -56,7 +55,6 @@ interface DirectoryPanelProps {
   workingDirectory: string;
   onDirectoryChange?: (path: string) => void;
   onMentionInsert?: (mention: string) => void;
-  onNewConversation?: () => void;
   className?: string;
 }
 
@@ -64,7 +62,6 @@ export function DirectoryPanel({
   workingDirectory,
   onDirectoryChange,
   onMentionInsert,
-  onNewConversation,
   className = "",
 }: DirectoryPanelProps) {
   const { t } = useTranslation();
@@ -705,17 +702,6 @@ export function DirectoryPanel({
           <span className="font-medium text-sm">{workingDirectory}</span>
         </div>
         <div className="flex items-center gap-1">
-          {onNewConversation && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onNewConversation}
-              title={t("directoryPanel.newConversation", "New Conversation in this folder")}
-              className="h-6 w-6 p-0"
-            >
-              <MessageSquarePlus className="h-3 w-3" />
-            </Button>
-          )}
           <Button
             variant="ghost"
             size="sm"

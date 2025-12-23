@@ -12,6 +12,7 @@ import {
   Play,
   ChevronRight,
   ChevronDown,
+  Undo,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -123,6 +124,33 @@ export function GitPanel({ workingDirectory, className = "" }: GitPanelProps) {
     }
   };
 
+  const handleDiscard = () => {
+    if (!confirm("确定要撤销所有当前变更吗？此操作无法恢复。")) {
+      return;
+    }
+    setIsCommitting(true);
+    api.git_reset({
+      path: workingDirectory,
+      commitHash: "HEAD",
+      mode: "hard",
+    })
+      .then((success) => {
+        if (success) {
+          toast.success("已撤销变更");
+          setCommitMessage("");
+          fetchStatus();
+        } else {
+          toast.error("撤销失败");
+        }
+      })
+      .catch(() => {
+        toast.error("撤销失败");
+      })
+      .finally(() => {
+        setIsCommitting(false);
+      });
+  };
+
   const handleReset = async (commitHash: string) => {
     if (
       confirm(
@@ -229,21 +257,33 @@ export function GitPanel({ workingDirectory, className = "" }: GitPanelProps) {
               onKeyDown={handleKeyDown}
               className="text-xs h-9"
             />
-            <Button
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-              onClick={handleCommit}
-              disabled={isCommitting || changesCount === 0}
-            >
-              {isCommitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 提交中...
-                </>
-              ) : (
-                <>
-                  <GitCommit className="mr-2 h-4 w-4" /> 提交 Ctrl+Enter
-                </>
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={handleCommit}
+                disabled={isCommitting || changesCount === 0}
+              >
+                {isCommitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 提交中...
+                  </>
+                ) : (
+                  <>
+                    <GitCommit className="mr-2 h-4 w-4" /> 提交 Ctrl+Enter
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleDiscard}
+                disabled={isCommitting || changesCount === 0}
+                title="撤销变更"
+                className="shrink-0"
+              >
+                <Undo className="h-4 w-4" />
+              </Button>
+            </div>
             
             {/* Working Tree Status Summary (moved here) */}
             <div className="pt-1">

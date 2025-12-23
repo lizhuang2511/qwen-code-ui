@@ -176,6 +176,9 @@ class Api:
     def git_reset(self, params: Dict[str, Any]) -> bool:
         return git_utils.reset(params.get("path", ""), params.get("commitHash", ""), params.get("mode", "mixed"))
 
+    def git_restore(self, params: Dict[str, Any]) -> bool:
+        return git_utils.restore(params.get("path", ""), params.get("commitHash"))
+
     def read_file_content(self, params: Dict[str, Any]) -> Dict[str, Any]:
         return filesystem.read_file_content(params.get("path", ""))
 

@@ -1,6 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { FolderTree, Settings as SettingsIcon, GitBranch } from "lucide-react";
+import { FolderTree, Settings as SettingsIcon, GitBranch, MessageSquarePlus } from "lucide-react";
 import { SmartLogo } from "../branding/SmartLogo";
 import { DesktopText } from "../branding/DesktopText";
 import { SidebarTrigger } from "../ui/sidebar";
@@ -15,6 +15,7 @@ interface AppHeaderProps {
   showDirectoryButton?: boolean;
   onReturnToDashboard?: () => void;
   onOpenSettings?: () => void;
+  onNewChat?: () => void;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -26,6 +27,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   showDirectoryButton,
   onReturnToDashboard,
   onOpenSettings,
+  onNewChat,
 }) => {
   const { t } = useTranslation();
 
@@ -75,14 +77,25 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
           {/* Right section - Settings + Directory Toggle */}
           <div className="flex flex-1 items-center justify-end gap-2">
-            {onOpenSettings && (
+            {onNewChat && shouldShowDirectoryButton && (
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={onOpenSettings}
-                title={t("common.settings")}
+                onClick={onNewChat}
+                title={t("directoryPanel.newConversation", "New Conversation in this folder")}
               >
-                <SettingsIcon className="h-4 w-4" />
+                <MessageSquarePlus className="h-4 w-4" />
+              </Button>
+            )}
+            {onDirectoryPanelToggle && shouldShowDirectoryButton && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onDirectoryPanelToggle}
+                className={`${isDirectoryPanelOpen ? "bg-muted" : ""}`}
+                title={t("directoryPanel.title", "Files")}
+              >
+                <FolderTree className="h-4 w-4" />
               </Button>
             )}
             {onGitPanelToggle && shouldShowDirectoryButton && (
@@ -96,15 +109,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 <GitBranch className="h-4 w-4" />
               </Button>
             )}
-            {onDirectoryPanelToggle && shouldShowDirectoryButton && (
+            {onOpenSettings && (
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={onDirectoryPanelToggle}
-                className={`${isDirectoryPanelOpen ? "bg-muted" : ""}`}
-                title={t("directoryPanel.title", "Files")}
+                onClick={onOpenSettings}
+                title={t("common.settings")}
               >
-                <FolderTree className="h-4 w-4" />
+                <SettingsIcon className="h-4 w-4" />
               </Button>
             )}
           </div>

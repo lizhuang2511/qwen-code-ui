@@ -13,7 +13,7 @@ import { Send, Info, ImagePlus, Play, Loader2 } from "lucide-react";
 import { useBackend } from "../../contexts/BackendContext";
 import { getBackendText } from "../../utils/backendText";
 import { CliIO } from "../../types";
-import { GitInfo } from "../common/GitInfo";
+
 import { useMessageTimer } from "../../hooks/useMessageTimer";
 import { useWittyLoadingPhrase } from "../../hooks/useWittyLoadingPhrase";
 
@@ -132,12 +132,7 @@ export const MessageInputBar = forwardRef<
               </span>
             </div>
           )}
-          {/* Git info - positioned above input */}
-          {workingDirectory && workingDirectory !== "." && (
-            <div className="mb-2">
-              <GitInfo directory={workingDirectory} compact={true} />
-            </div>
-          )}
+
           <form
             className="flex gap-2 items-end mt-2"
             onSubmit={handleSendMessage}

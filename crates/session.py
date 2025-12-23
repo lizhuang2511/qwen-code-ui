@@ -4,6 +4,7 @@ import shutil
 import os
 import time
 import json
+import queue
 from typing import Dict, Optional, List, Any
 from pathlib import Path
 from datetime import datetime
@@ -138,7 +139,22 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                 }
                 logger.log(payload)
 
-        for line in proc.stdout:
+        def line_generator():
+            if isinstance(proc, QwenProcess):
+                while True:
+                    try:
+                        # QwenProcess.stdout_queue stores decoded strings or None
+                        line = proc.stdout_queue.get(timeout=0.05)
+                        if line is None:
+                            return
+                        yield line
+                    except queue.Empty:
+                        flush_ui_buffer()
+            else:
+                for line in proc.stdout:
+                    yield line
+
+        for line in line_generator():
             txt = line.rstrip("\n")
             ln = txt[:LINE_LIMIT_BYTES]
             total += len(ln.encode("utf-8"))
@@ -280,7 +296,7 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                     events.emit(f"cli-io-{session_id}", {"type": "output", "data": cli_data})
                     if content:
                         ui_buffer.append(content)
-                        if time.time() - last_emit_time > 0.1:
+                        if time.time() - last_emit_time > 0.05:
                             flush_ui_buffer()
                         
                         # Buffer assistant message chunk for logging

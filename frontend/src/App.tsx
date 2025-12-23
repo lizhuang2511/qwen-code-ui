@@ -577,6 +577,7 @@ function RootLayoutContent() {
                   navigate("/projects");
                 }}
                 onOpenSettings={() => setIsSettingsOpen(true)}
+                onNewChat={handleNewConversationFromDirectory}
               />
             </div>
 
@@ -627,7 +628,6 @@ function RootLayoutContent() {
                         console.log("📁 [App] Directory changed to:", path);
                       }}
                       onMentionInsert={handleMentionInsert}
-                      onNewConversation={handleNewConversationFromDirectory}
                       className="w-full h-full"
                     />
                   )}
