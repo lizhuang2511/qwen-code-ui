@@ -110,7 +110,7 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-4xl px-6 py-8">
         <button
           type="button"

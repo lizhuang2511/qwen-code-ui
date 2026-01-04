@@ -198,18 +198,6 @@ export type BackendAction =
   | { type: "RESET_CONFIG"; backend: BackendType }
   | { type: "LOAD_FROM_STORAGE"; state: BackendState };
 
-export interface GitInfo {
-  is_repo: boolean;
-  current_branch?: string;
-  staged?: { path: string; change_type: string }[];
-  unstaged?: { path: string; change_type: string }[];
-  untracked?: string[];
-  error?: string;
-  // Deprecated fields kept for compatibility if needed, or remove them if fully migrated
-  current_directory?: string;
-  branch?: string;
-  status?: string;
-  is_clean?: boolean;
-  has_uncommitted_changes?: boolean;
-  has_untracked_files?: boolean;
+export interface VersionInfo {
+  is_initialized: boolean;
 }

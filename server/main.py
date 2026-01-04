@@ -15,6 +15,7 @@ from crates.filesystem import get_home_directory
 from crates.session import get_process_statuses, start_session, send_message, kill_process
 import crates.events as events
 import crates.projects as projects
+import crates.backend.version_utils as version_utils
 
 app = FastAPI()
 logger = logging.getLogger("app")
@@ -205,3 +206,18 @@ def api_send_message(req: SendMessageRequest) -> Dict[str, Any]:
         return {"ok": False, "error": "missing sessionId or message"}
     send_message(req.session_id, req.message)
     return {"ok": True}
+
+class ExcludedPathsRequest(BaseModel):
+    path: str
+    excluded: Optional[List[str]] = None
+
+@app.post("/api/get-excluded-paths")
+def api_get_excluded_paths(req: ExcludedPathsRequest) -> List[str]:
+    return version_utils.get_excluded_paths(req.path)
+
+@app.post("/api/save-excluded-paths")
+def api_save_excluded_paths(req: ExcludedPathsRequest) -> bool:
+    if req.excluded is None:
+        return False
+    return version_utils.update_excluded_paths(req.path, req.excluded)
+

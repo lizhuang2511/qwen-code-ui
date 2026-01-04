@@ -3,7 +3,6 @@ import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 import { toJsxRuntime } from "hast-util-to-jsx-runtime";
 import {
   type BundledLanguage,
-  bundledLanguages,
   bundledThemes,
   createHighlighter,
 } from "shiki/bundle/full";
@@ -148,11 +147,11 @@ export const highlightCode = async (
       }
     }
 
-    // Check if the language is valid before attempting to highlight
-    const validLanguage =
-      mappedLanguage in bundledLanguages
-        ? (mappedLanguage as BundledLanguage)
-        : ("text" as BundledLanguage);
+    // Check if the language is valid and loaded before attempting to highlight
+    const isLoaded = highlighter.getLoadedLanguages().includes(mappedLanguage);
+    const validLanguage = isLoaded
+      ? (mappedLanguage as BundledLanguage)
+      : ("text" as BundledLanguage);
 
     let capturedPreStyle = "";
 

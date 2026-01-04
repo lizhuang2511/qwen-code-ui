@@ -9,7 +9,7 @@ import { getBackendText } from "../utils/backendText";
 import { ArrowLeft, Plus, Loader2, Trash2 } from "lucide-react";
 import { EnrichedProject } from "../lib/webApi";
 import { useTranslation } from "react-i18next";
-import { GitInfo } from "../components/common/GitInfo";
+import { ProjectInfo } from "../components/common/ProjectInfo";
 import { InlineSessionProgress } from "../components/common/InlineSessionProgress";
 import { useSessionProgress } from "../hooks/useSessionProgress";
 import { toast } from "sonner";
@@ -257,10 +257,10 @@ export default function ProjectDetailPage() {
             )}
           </div>
 
-          {/* Git Information */}
+          {/* Project Information */}
           {projectData && (
             <div className="mt-4">
-              <GitInfo
+              <ProjectInfo
                 directory={projectData.metadata.path}
               />
             </div>

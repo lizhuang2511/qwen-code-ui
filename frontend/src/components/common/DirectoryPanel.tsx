@@ -17,10 +17,13 @@ import {
   Move,
   Scissors,
   FilePlus,
+  FileMinus,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { ScrollArea, ScrollBar } from "../ui/scroll-area";
 import { api } from "../../lib/api";
+import { listen } from "../../lib/listen";
 import { FileContentViewer } from "./FileContentViewer";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
 import { Input } from "../ui/input";
@@ -69,6 +72,12 @@ export function DirectoryPanel({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewingFile, setViewingFile] = useState<string | null>(null);
+  
+  // Persist expanded paths
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  
+  // Excluded paths state
+  const [excludedPaths, setExcludedPaths] = useState<string[]>([]);
   
   // Paste text dialog state
   const [pasteDialogOpen, setPasteDialogOpen] = useState(false);
@@ -157,6 +166,16 @@ export function DirectoryPanel({
     [workingDirectory]
   );
 
+  const fetchExcludedPaths = useCallback(async () => {
+    if (!workingDirectory) return;
+    try {
+      const paths = await api.get_excluded_paths({ path: workingDirectory });
+      setExcludedPaths(paths);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [workingDirectory]);
+
   // Handle file click to insert mention or view content
   const handleFileClick = useCallback(
     (node: TreeNode, event: React.MouseEvent) => {
@@ -199,7 +218,7 @@ export function DirectoryPanel({
   const loadDirectoryContents = useCallback(
     async (path: string): Promise<TreeNode[]> => {
       try {
-        console.log("📁 [DirectoryPanel] Loading contents for:", path);
+        // console.log("📁 [DirectoryPanel] Loading contents for:", path);
         const entries = await api.list_directory_contents({ path });
 
         // Sort entries: directories first, then files, both alphabetically
@@ -224,7 +243,7 @@ export function DirectoryPanel({
     []
   );
 
-  // Initialize root directory
+  // Initialize root directory with state restoration
   const initializeRoot = useCallback(async () => {
     if (!workingDirectory) return;
 
@@ -239,7 +258,7 @@ export function DirectoryPanel({
           ? pathParts[pathParts.length - 1]
           : workingDirectory;
 
-      setRootNode({
+      let root: TreeNode = {
         name: rootName || "Root",
         is_directory: true,
         full_path: workingDirectory,
@@ -247,14 +266,54 @@ export function DirectoryPanel({
         isExpanded: true,
         isLoading: false,
         hasError: false,
-      });
+      };
+      
+      // Recursive function to restore expanded state
+      const restoreExpansion = async (node: TreeNode): Promise<TreeNode> => {
+        if (!node.is_directory || !node.children) return node;
+        
+        // Process children concurrently
+        const updatedChildren = await Promise.all(
+            node.children.map(async (child) => {
+                if (child.is_directory && expandedPaths.has(child.full_path)) {
+                    try {
+                        const grandChildren = await loadDirectoryContents(child.full_path);
+                        const expandedChild = {
+                            ...child,
+                            isExpanded: true,
+                            children: grandChildren
+                        };
+                        return restoreExpansion(expandedChild);
+                    } catch (e) {
+                        console.error(`Failed to restore expansion for ${child.full_path}`, e);
+                        return child;
+                    }
+                }
+                return child;
+            })
+        );
+        
+        return {
+            ...node,
+            children: updatedChildren
+        };
+      };
+
+      // Restore expansion state
+      root = await restoreExpansion(root);
+
+      setRootNode(root);
+      
+      // Fetch excluded paths
+      await fetchExcludedPaths();
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load directory");
       setRootNode(null);
     } finally {
       setIsLoading(false);
     }
-  }, [workingDirectory, loadDirectoryContents]);
+  }, [workingDirectory, loadDirectoryContents, fetchExcludedPaths, expandedPaths]);
 
   // Toggle directory expansion
   const toggleDirectory = useCallback(
@@ -288,13 +347,22 @@ export function DirectoryPanel({
 
       if (node.isExpanded) {
         // Collapse
+        setExpandedPaths(prev => {
+            const next = new Set(prev);
+            next.delete(node.full_path);
+            return next;
+        });
+        
         setRootNode((prev) =>
           prev
             ? updateNodeInTree(prev, node, (n) => ({ ...n, isExpanded: false }))
             : prev
         );
       } else {
-        // Expand - first set loading state
+        // Expand
+        setExpandedPaths(prev => new Set(prev).add(node.full_path));
+        
+        // first set loading state
         setRootNode((prev) =>
           prev
             ? updateNodeInTree(prev, node, (n) => ({ ...n, isLoading: true }))
@@ -311,7 +379,7 @@ export function DirectoryPanel({
                   isExpanded: true,
                   isLoading: false,
                   hasError: false,
-                }))
+                  }))
               : prev
           );
         } catch (err) {
@@ -322,7 +390,7 @@ export function DirectoryPanel({
                   ...n,
                   isLoading: false,
                   hasError: true,
-                }))
+                  }))
               : prev
           );
         }
@@ -479,11 +547,65 @@ export function DirectoryPanel({
       toast.error(t("directoryPanel.moveFailed", "Failed to move item"));
     }
   };
+  
+  const handleExclude = async (node: TreeNode) => {
+    try {
+        const relPath = getRelativePath(node.full_path);
+        // Avoid duplicates
+        if (!excludedPaths.includes(relPath)) {
+            const newPaths = [...excludedPaths, relPath];
+            await api.save_excluded_paths({ path: workingDirectory, excluded: newPaths });
+            setExcludedPaths(newPaths);
+            toast.success(t("directoryPanel.excluded", "Item excluded"));
+        }
+    } catch (e) {
+        console.error(e);
+        toast.error(t("directoryPanel.excludeFailed", "Failed to exclude"));
+    }
+  };
+
+  const handleCancelExclude = async (node: TreeNode) => {
+    try {
+        const relPath = getRelativePath(node.full_path);
+        const newPaths = excludedPaths.filter(p => p !== relPath);
+        await api.save_excluded_paths({ path: workingDirectory, excluded: newPaths });
+        setExcludedPaths(newPaths);
+        toast.success(t("directoryPanel.exclusionCanceled", "Exclusion canceled"));
+    } catch (e) {
+        console.error(e);
+        toast.error(t("directoryPanel.cancelExcludeFailed", "Failed to cancel exclusion"));
+    }
+  };
 
   // Initialize on mount and when working directory changes
   useEffect(() => {
     initializeRoot();
   }, [initializeRoot]);
+
+  // Listen for fs-change events
+  useEffect(() => {
+    let unlisten: () => void;
+    
+    // Debounce timer
+    let timer: NodeJS.Timeout | null = null;
+
+    const setupListener = async () => {
+        unlisten = await listen<any>("fs-change", () => {
+            // console.log("Received fs-change event", event);
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => {
+                refreshDirectory();
+            }, 500); // 500ms debounce
+        });
+    };
+    
+    setupListener();
+    
+    return () => {
+        if (unlisten) unlisten();
+        if (timer) clearTimeout(timer);
+    };
+  }, [refreshDirectory]);
 
   // Render tree node
   const renderTreeNode = useCallback(
@@ -501,13 +623,18 @@ export function DirectoryPanel({
       };
 
       const isCut = internalClipboard?.type === "cut" && internalClipboard.path === node.full_path;
+      
+      const relativePath = getRelativePath(node.full_path);
+      const isSystemExcluded = node.name === ".git" || node.name === ".history";
+      const isExcluded = excludedPaths.includes(relativePath);
+      const isVisualExcluded = isExcluded || isSystemExcluded;
 
       return (
         <div key={node.full_path}>
           <ContextMenu>
             <ContextMenuTrigger>
               <div
-                className={`flex items-center gap-2 py-1 pr-2 hover:bg-muted/50 cursor-pointer text-sm rounded-sm transition-colors relative group ${isCut ? "opacity-50" : ""}`}
+                className={`flex items-center gap-2 py-1 pr-2 hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm rounded-sm transition-colors relative group ${isCut ? "opacity-50" : ""}`}
                 style={{
                   paddingLeft: `${depth * 24}px`,
                 }}
@@ -544,7 +671,7 @@ export function DirectoryPanel({
 
                 {/* Name */}
                 <span
-                  className="text-foreground flex-1 whitespace-nowrap"
+                  className={`text-foreground flex-1 whitespace-nowrap ${isVisualExcluded ? "text-green-600 font-medium" : ""}`}
                   title={
                     node.is_directory
                       ? node.name
@@ -658,6 +785,20 @@ export function DirectoryPanel({
                 {t("directoryPanel.move", "Move/Rename")}
               </ContextMenuItem>
               <ContextMenuSeparator />
+              
+              {!isSystemExcluded && (isExcluded ? (
+                  <ContextMenuItem onClick={() => handleCancelExclude(node)}>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    {t("directoryPanel.cancelExclusion", "Cancel Exclusion")}
+                  </ContextMenuItem>
+              ) : (
+                  <ContextMenuItem onClick={() => handleExclude(node)}>
+                    <FileMinus className="mr-2 h-4 w-4" />
+                    {t("directoryPanel.exclude", "Exclude File/Folder")}
+                  </ContextMenuItem>
+              ))}
+              
+              <ContextMenuSeparator />
               <ContextMenuItem
                 variant="destructive"
                 onClick={() => {
@@ -688,6 +829,12 @@ export function DirectoryPanel({
       handleFileClick,
       handleFolderPlusClick,
       onMentionInsert,
+      excludedPaths, // Add dependency
+      getRelativePath,
+      handleExclude,
+      handleCancelExclude,
+      t,
+      internalClipboard,
     ]
   );
 

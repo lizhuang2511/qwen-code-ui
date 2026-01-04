@@ -3,6 +3,8 @@ import base64
 import shutil
 from pathlib import Path
 from typing import List, Dict, Optional
+from datetime import datetime
+import backend.git_utils as git_utils
 
 def get_home_directory() -> str:
     return str(Path.home())
@@ -21,17 +23,76 @@ def validate_directory(path: str) -> bool:
 def list_directory_contents(path: str) -> List[Dict]:
     entries: List[Dict] = []
     p = Path(path)
-    for item in p.iterdir():
-        stat = item.stat()
-        entries.append(
-            {
-                "name": item.name,
-                "is_directory": item.is_dir(),
-                "full_path": str(item.resolve()),
-                "size": int(stat.st_size),
-                "modified": int(stat.st_mtime),
-            }
-        )
+    
+    # Get excluded paths
+    # The config is per-project, so we need to find the project root.
+    # For simplicity, we check if the current path or its parents have .history.
+    # But git_utils.get_excluded_paths expects the project root.
+    # If path is inside a project, we should try to find the root.
+    # However, list_directory_contents might be called on any path.
+    # We will try to load config from the current directory if it has .history,
+    # or rely on the frontend passing the project root?
+    # Actually, `git_utils.get_excluded_paths` takes `path` and looks for `.history` inside it.
+    # If `path` is a subdirectory of the project, `_get_history_dir` will look for `.history` inside `path`, which is wrong.
+    # But typically `list_directory_contents` is called for the project root or subdirs.
+    # If we are in a subdir, we should ideally traverse up.
+    # But for now, let's assume we filter based on the config in the *current* path if it exists,
+    # OR we need a way to pass the exclusion list.
+    #
+    # Wait, the user requirement says "Change detailed information settings area to, settings item excluded file directories."
+    # This implies global or project setting.
+    # Let's try to find the project root by looking for .history up the tree.
+    
+    project_root = path
+    curr = p
+    # Traverse up to find .history
+    # Limit traversal to avoid performance hit
+    found_root = False
+    for _ in range(5):
+        if (curr / ".history").exists():
+            project_root = str(curr)
+            found_root = True
+            break
+        if curr.parent == curr:
+            break
+        curr = curr.parent
+        
+    excluded = []
+    if found_root:
+        excluded = git_utils.get_excluded_paths(project_root)
+        
+    # Also we need to filter based on relative path from project root if found
+    
+    try:
+        for item in p.iterdir():
+            # Check exclusions
+            if item.name in excluded:
+                continue
+            
+            if found_root:
+                try:
+                    rel_path = item.relative_to(project_root)
+                    if str(rel_path) in excluded:
+                        continue
+                except:
+                    pass
+            
+            stat = item.stat()
+            formatted_time = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+            
+            entries.append(
+                {
+                    "name": item.name,
+                    "is_directory": item.is_dir(),
+                    "full_path": str(item.resolve()),
+                    "size": int(stat.st_size),
+                    "modified": int(stat.st_mtime),
+                    "modified_str": formatted_time, # Added formatted time
+                }
+            )
+    except Exception as e:
+        print(f"Error listing directory {path}: {e}")
+        
     return entries
 
 def read_file_content(path: str) -> Dict:

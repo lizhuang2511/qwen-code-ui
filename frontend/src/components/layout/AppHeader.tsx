@@ -1,6 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { FolderTree, Settings as SettingsIcon, GitBranch, MessageSquarePlus } from "lucide-react";
+import { FolderTree, Settings as SettingsIcon, History, MessageSquarePlus } from "lucide-react";
 import { SmartLogo } from "../branding/SmartLogo";
 import { DesktopText } from "../branding/DesktopText";
 import { SidebarTrigger } from "../ui/sidebar";
@@ -9,8 +9,8 @@ import { Button } from "../ui/button";
 interface AppHeaderProps {
   onDirectoryPanelToggle?: () => void;
   isDirectoryPanelOpen?: boolean;
-  onGitPanelToggle?: () => void;
-  isGitPanelOpen?: boolean;
+  onVersionPanelToggle?: () => void;
+  isVersionPanelOpen?: boolean;
   hasActiveConversation?: boolean;
   showDirectoryButton?: boolean;
   onReturnToDashboard?: () => void;
@@ -21,8 +21,8 @@ interface AppHeaderProps {
 export const AppHeader: React.FC<AppHeaderProps> = ({
   onDirectoryPanelToggle,
   isDirectoryPanelOpen = false,
-  onGitPanelToggle,
-  isGitPanelOpen = false,
+  onVersionPanelToggle,
+  isVersionPanelOpen = false,
   hasActiveConversation = false,
   showDirectoryButton,
   onReturnToDashboard,
@@ -98,15 +98,15 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 <FolderTree className="h-4 w-4" />
               </Button>
             )}
-            {onGitPanelToggle && shouldShowDirectoryButton && (
+            {onVersionPanelToggle && shouldShowDirectoryButton && (
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={onGitPanelToggle}
-                className={`${isGitPanelOpen ? "bg-muted" : ""}`}
-                title="Git Management"
+                onClick={onVersionPanelToggle}
+                className={`${isVersionPanelOpen ? "bg-muted" : ""}`}
+                title="Version History"
               >
-                <GitBranch className="h-4 w-4" />
+                <History className="h-4 w-4" />
               </Button>
             )}
             {onOpenSettings && (

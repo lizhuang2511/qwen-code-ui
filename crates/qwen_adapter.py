@@ -13,11 +13,12 @@ class QwenProcess:
     Adapts the Qwen CLI (using persistent ACP protocol) to a process-like interface
     compatible with session.py.
     """
-    def __init__(self, executable: str, model: Optional[str] = None, cwd: Optional[str] = None, env_vars: Optional[Dict[str, str]] = None):
+    def __init__(self, executable: str, model: Optional[str] = None, cwd: Optional[str] = None, env_vars: Optional[Dict[str, str]] = None, yolo: bool = False):
         self.executable = executable
         self.model = model
         self.cwd = cwd or os.getcwd()
         self.env_vars = env_vars or {}
+        self.yolo = yolo
         self.history: List[Dict[str, str]] = []
         self.stdout_queue = queue.Queue()
         self.stderr_queue = queue.Queue()
@@ -42,6 +43,8 @@ class QwenProcess:
 
         # Use experimental-acp flag
         cmd = [self.executable, "--experimental-acp", "--no-telemetry"]
+        if self.yolo:
+            cmd.append("--yolo")
         if self.model:
             cmd.extend(["--model", self.model])
 

@@ -165,8 +165,16 @@ const CodeBlock = React.memo(
 
           let capturedPreStyle = "";
 
+          // Check if language is actually loaded (in case loadLanguage failed)
+          const isLoaded = highlighter
+            .getLoadedLanguages()
+            .includes(mappedLanguage);
+          const validLanguage = isLoaded
+            ? (mappedLanguage as BundledLanguage)
+            : ("text" as BundledLanguage);
+
           const hast = highlighter.codeToHast(code, {
-            lang: mappedLanguage,
+            lang: validLanguage,
             theme: currentTheme,
             transformers: [
               {

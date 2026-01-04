@@ -17,7 +17,7 @@ import { AppHeader } from "./components/layout/AppHeader";
 import { ConversationSearchDialog } from "./components/conversation/ConversationSearchDialog";
 import { CustomTitleBar } from "./components/layout/CustomTitleBar";
 import { DirectoryPanel } from "./components/common/DirectoryPanel";
-import { GitPanel } from "./components/git/GitPanel";
+import { VersionPanel } from "./components/version/VersionPanel";
 import { SidebarInset, SidebarResizeHandle } from "./components/ui/sidebar";
 import { Toaster } from "./components/ui/sonner";
 import { ConversationContext } from "./contexts/ConversationContext";
@@ -77,8 +77,8 @@ function RootLayoutContent() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
-  // Right panel state: 'none' | 'directory' | 'git'
-  const [activeRightPanel, setActiveRightPanel] = useState<"none" | "directory" | "git">("none");
+  // Right panel state: 'none' | 'directory' | 'version'
+  const [activeRightPanel, setActiveRightPanel] = useState<"none" | "directory" | "version">("none");
   
   const [searchOpen, setSearchOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -424,8 +424,8 @@ function RootLayoutContent() {
     setActiveRightPanel((prev) => (prev === "directory" ? "none" : "directory"));
   }, []);
 
-  const toggleGitPanel = useCallback(() => {
-    setActiveRightPanel((prev) => (prev === "git" ? "none" : "git"));
+  const toggleVersionPanel = useCallback(() => {
+    setActiveRightPanel((prev) => (prev === "version" ? "none" : "version"));
   }, []);
 
   // Auto-close right panel when active conversation ends, unless we are on project detail page
@@ -566,8 +566,8 @@ function RootLayoutContent() {
               <AppHeader
                 onDirectoryPanelToggle={toggleDirectoryPanel}
                 isDirectoryPanelOpen={activeRightPanel === "directory"}
-                onGitPanelToggle={toggleGitPanel}
-                isGitPanelOpen={activeRightPanel === "git"}
+                onVersionPanelToggle={toggleVersionPanel}
+                isVersionPanelOpen={activeRightPanel === "version"}
                 hasActiveConversation={!!activeConversation}
                 showDirectoryButton={
                   !!activeConversation || isProjectDetailPage
@@ -631,8 +631,8 @@ function RootLayoutContent() {
                       className="w-full h-full"
                     />
                   )}
-                  {activeRightPanel === "git" && (
-                    <GitPanel
+                  {activeRightPanel === "version" && (
+                    <VersionPanel
                       workingDirectory={workingDirectory}
                       className="w-full h-full"
                     />

@@ -100,11 +100,13 @@ def resolve_executable(backend: str) -> str:
     return resolve_gemini_executable()
 
 
-def build_client(backend: str, model: Optional[str], working_dir: Optional[str]) -> CliClient:
+def build_client(backend: str, model: Optional[str], working_dir: Optional[str], yolo: bool = False) -> CliClient:
     exe = resolve_executable(backend)
     args: List[str] = []
     if model:
         args.extend(["--model", model])
+    if yolo:
+        args.append("--yolo")
     name = backend or "gemini"
     parser = "text"
     if (backend or "").lower() == "gemini":

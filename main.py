@@ -113,10 +113,10 @@ def set_window_icon(hwnd, icon_path):
         print(f"[Icon] Failed to load big icon. Error: {ctypes.GetLastError()}")
 
 
-def start_ticker(icon_path=None):
+def start_ticker(stop_event, window, icon_path=None):
     def loop():
         import ctypes
-        threading.Event().wait(1.0)
+        stop_event.wait(1.0)
         
         # Try setting icon for Windows
         if icon_path and os.name == 'nt':
@@ -168,20 +168,23 @@ def start_ticker(icon_path=None):
             except Exception as e:
                 print(f"[Icon] Failed to set window icon: {e}")
 
-        threading.Event().wait(1.0)
-        while True:
+        stop_event.wait(1.0)
+        while not stop_event.is_set():
             if len(webview.windows) == 0:
                 return
-            w = webview.windows[0]
+            # Use the passed window object or get from list
+            w = window if window else webview.windows[0]
+            
             payload = {"time": int(threading.get_native_id())}
-            try:
+            
+            # Check if window is still valid/running
+            if not stop_event.is_set():
                 w.evaluate_js(
                     'window.dispatchEvent(new CustomEvent("ticker",{detail:%s}))'
                     % json.dumps(payload)
                 )
-            except:
-                pass
-            threading.Event().wait(1.0)
+
+            stop_event.wait(1.0)
 
     t = threading.Thread(target=loop, daemon=True)
     t.start()
@@ -201,6 +204,7 @@ if __name__ == "__main__":
         height=800
     )
     dev = os.environ.get("FRONTEND_DEV", "")
+    stop_event = threading.Event()
 
     def on_closing():
         # Prompt user to save conversation history
@@ -212,6 +216,7 @@ if __name__ == "__main__":
         if should_save:
             print("Saving all conversations...")
             # Actual saving is handled by RpcLogger/backend automatically
+        stop_event.set()
         return True
 
     window.events.closing += on_closing
@@ -221,7 +226,7 @@ if __name__ == "__main__":
         # but pywebview expects a function.
         # We can pass arguments via global or closure, but here we can wrap it.
         def ticker_wrapper():
-            start_ticker(icon_path)
+            start_ticker(stop_event, window, icon_path)
             
         webview.start(ticker_wrapper, debug=(dev == "1"), icon=icon_path)
     except KeyboardInterrupt:

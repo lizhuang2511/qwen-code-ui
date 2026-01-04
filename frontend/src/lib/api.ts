@@ -138,28 +138,31 @@ export interface API {
     externalRootPath: string;
   }): Promise<EnrichedProject>;
   delete_project(params: { projectId: string }): Promise<void>;
-  get_git_info(params: { path: string }): Promise<{
-    is_repo: boolean;
-    current_branch?: string;
-    staged?: { path: string; change_type: string }[];
-    unstaged?: { path: string; change_type: string }[];
-    untracked?: string[];
-    error?: string;
+  get_version_info(params: { path: string }): Promise<{
+    is_initialized: boolean;
   } | null>;
-  git_init(params: { path: string }): Promise<boolean>;
-  git_commit(params: { path: string; message: string }): Promise<boolean>;
-  git_log(params: { path: string; limit?: number }): Promise<{
-    hexsha: string;
+  version_init(params: { path: string }): Promise<boolean>;
+  version_create(params: { path: string; message: string; name?: string }): Promise<boolean>;
+  version_list(params: { path: string; limit?: number }): Promise<{
+    id: string;
+    name?: string;
     message: string;
-    author_name: string;
-    author_email: string;
     date: string;
-    summary: string;
+    size?: number;
+    formatted_time?: string;
   }[]>;
-  git_reset(params: {
+  version_restore(params: {
     path: string;
-    commitHash: string;
-    mode?: "soft" | "mixed" | "hard";
+    versionId: string;
+  }): Promise<boolean>;
+  version_delete(params: {
+    path: string;
+    versionId: string;
+  }): Promise<boolean>;
+  get_excluded_paths(params: { path: string }): Promise<string[]>;
+  save_excluded_paths(params: {
+    path: string;
+    excluded: string[];
   }): Promise<boolean>;
   read_file_content(params: { path: string }): Promise<{
     path: string;

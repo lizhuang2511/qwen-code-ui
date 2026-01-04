@@ -13,7 +13,7 @@ import session
 import webview
 import struct
 import sys
-import backend.git_utils as git_utils
+import backend.version_utils as version_utils
 try:
     import win32clipboard
     import win32con
@@ -158,26 +158,44 @@ class Api:
     def delete_project(self, params: Dict[str, Any]) -> None:
         projects.delete_project(params.get("projectId", ""))
 
-    def get_git_info(self, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def get_version_info(self, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         path = params.get("path", "")
         if not path:
             return None
-        return git_utils.get_status(path)
+        return version_utils.get_version_info(path)
 
-    def git_init(self, params: Dict[str, Any]) -> bool:
-        return git_utils.init_repo(params.get("path", ""))
+    def version_init(self, params: Dict[str, Any]) -> bool:
+        return version_utils.init_backup(params.get("path", ""))
 
-    def git_commit(self, params: Dict[str, Any]) -> bool:
-        return git_utils.commit(params.get("path", ""), params.get("message", ""))
+    def version_create(self, params: Dict[str, Any]) -> bool:
+        return version_utils.create_snapshot(params.get("path", ""), params.get("message", ""), params.get("name", ""))
 
-    def git_log(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
-        return git_utils.get_log(params.get("path", ""), params.get("limit", 20))
+    def version_list(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+        return version_utils.get_history(params.get("path", ""), params.get("limit", 20))
 
-    def git_reset(self, params: Dict[str, Any]) -> bool:
-        return git_utils.reset(params.get("path", ""), params.get("commitHash", ""), params.get("mode", "mixed"))
+    def version_restore(self, params: Dict[str, Any]) -> bool:
+        return version_utils.restore_version(params.get("path", ""), params.get("versionId"))
 
-    def git_restore(self, params: Dict[str, Any]) -> bool:
-        return git_utils.restore(params.get("path", ""), params.get("commitHash"))
+    def version_delete(self, params: Dict[str, Any]) -> bool:
+        return version_utils.delete_version(params.get("path", ""), params.get("versionId", ""))
+    
+    def get_excluded_paths(self, params: Dict[str, Any]) -> List[str]:
+        return version_utils.get_excluded_paths(params.get("path", ""))
+
+    def save_excluded_paths(self, params: Dict[str, Any]) -> bool:
+        path = params.get("path", "")
+        # Expecting comma separated string as per requirement "Change detailed information settings area to, settings item excluded files, folders input comma separated directories."
+        # Or list? The UI might send a string or list. Let's support both or assume list if frontend parses it.
+        # But if the requirement says "input comma separated", the frontend might send a string "dir1,dir2".
+        excluded_input = params.get("excluded", [])
+        
+        excluded_list = []
+        if isinstance(excluded_input, str):
+            excluded_list = [x.strip() for x in excluded_input.split(",") if x.strip()]
+        elif isinstance(excluded_input, list):
+            excluded_list = [str(x).strip() for x in excluded_input if str(x).strip()]
+            
+        return version_utils.update_excluded_paths(path, excluded_list)
 
     def read_file_content(self, params: Dict[str, Any]) -> Dict[str, Any]:
         return filesystem.read_file_content(params.get("path", ""))

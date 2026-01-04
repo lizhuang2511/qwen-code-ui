@@ -119,28 +119,53 @@ export const webApi: API = {
     return response.data;
   },
 
-  async get_git_info(params) {
-    const response = await apiClient.post("/get-git-info", params);
+  async get_version_info(params) {
+    const response = await apiClient.post("/get-version-info", params);
     return response.data;
   },
 
-  async git_log(params) {
-    const response = await apiClient.post("/git-log", params);
+  async version_list(params) {
+    const response = await apiClient.post("/version-list", params);
     return response.data;
   },
 
-  async git_reset(params) {
-    const response = await apiClient.post("/git-reset", params);
+  async version_restore(params) {
+    try {
+        const response = await apiClient.post("/version-restore", params);
+        return response.data;
+    } catch (e) {
+        console.warn("version_restore failed", e);
+        return false;
+    }
+  },
+
+  async version_delete(params) {
+    try {
+        const response = await apiClient.post("/version-delete", params);
+        return response.data;
+    } catch (e) {
+        console.warn("version_delete failed", e);
+        return false;
+    }
+  },
+
+  async version_init(params) {
+    const response = await apiClient.post("/version-init", params);
     return response.data;
   },
 
-  async git_init(params) {
-    const response = await apiClient.post("/git-init", params);
+  async version_create(params) {
+    const response = await apiClient.post("/version-create", params);
     return response.data;
   },
 
-  async git_commit(params) {
-    const response = await apiClient.post("/git-commit", params);
+  async get_excluded_paths(params) {
+    const response = await apiClient.post<string[]>("/get-excluded-paths", params);
+    return response.data;
+  },
+
+  async save_excluded_paths(params) {
+    const response = await apiClient.post<boolean>("/save-excluded-paths", params);
     return response.data;
   },
 

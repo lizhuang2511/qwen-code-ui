@@ -10,6 +10,7 @@ from pathlib import Path
 from datetime import datetime
 import events
 import projects
+import watcher
 from cli_runner import build_client, build_command, resolve_executable, STREAM_LIMIT_BYTES, LINE_LIMIT_BYTES
 from parsers import parse_qwen_line
 from qwen_adapter import QwenProcess
@@ -393,11 +394,20 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
         "title": "New Conversation",
         "started_at_iso": datetime.utcnow().isoformat() + "Z",
         "current_assistant_message": "",
-        "logger": RpcLogger(session_id, project_id)
+        "logger": RpcLogger(session_id, project_id),
+        "file_watcher": None
     }
     
     # Initialize logger
     print(f"[SESSION] Registered session {session_id} with logger at {_sessions[session_id]['logger'].log_path}")
+    
+    # Start file watcher
+    try:
+        w = watcher.FileWatcher(wd)
+        w.start()
+        _sessions[session_id]["file_watcher"] = w
+    except Exception as e:
+        print(f"[SESSION] Failed to start file watcher: {e}")
 
     if not os.path.isdir(wd):
         _emit_progress(session_id, "failed", "Invalid working directory", 100, wd if wd else None)
@@ -425,9 +435,11 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
         # Determine mode from config or fallback to file existence
         use_oauth = True
         api_key = ""
+        yolo_mode = False
         if backend_config:
              use_oauth = backend_config.get("useOAuth", True)
              api_key = backend_config.get("apiKey", "")
+             yolo_mode = backend_config.get("yolo", False)
         else:
              # Fallback if no config provided (e.g. tests)
              use_oauth = QwenProcess.check_credentials()
@@ -452,7 +464,7 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
                 # Also set OPENAI_API_KEY just in case
                 env_vars["OPENAI_API_KEY"] = api_key
 
-        proc = QwenProcess(exe, mdl_to_use, wd, env_vars=env_vars)
+        proc = QwenProcess(exe, mdl_to_use, wd, env_vars=env_vars, yolo=yolo_mode)
         
         _emit_progress(session_id, "spawning_process", "Spawning process", 40, wd if wd else None)
         print(f"[SESSION] {session_id} spawn_adapter backend={backend_name} exe={exe} model={mdl} cwd={wd}")
@@ -513,7 +525,10 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
         threading.Thread(target=fallback, daemon=True).start()
         return
 
-    client = build_client(backend_name, mdl, wd)
+    yolo_mode = False
+    if backend_config:
+        yolo_mode = backend_config.get("yolo", False)
+    client = build_client(backend_name, mdl, wd, yolo=yolo_mode)
     cmd_list = build_command(client)
     exe = cmd_list[0] if len(cmd_list) > 0 else ""
     has_cli = exe != "" and (shutil.which(exe) is not None or os.path.basename(exe))
@@ -648,6 +663,15 @@ def kill_process(conversation_id: str) -> None:
         s["alive"] = False
         if s.get("proc"):
             s["proc"].terminate()
+        
+        # Stop file watcher
+        w = s.get("file_watcher")
+        if w:
+            try:
+                w.stop()
+            except Exception as e:
+                print(f"[SESSION] Error stopping watcher: {e}")
+            s["file_watcher"] = None
 
 def handle_permission_response(session_id: str, tool_call_id: str, outcome: str) -> None:
     print(f"[SESSION] Handling permission response: id={tool_call_id} outcome={outcome}")

@@ -1,83 +1,111 @@
-import sys
 import os
+import shutil
+import json
+import time
+import sys
 
-# Mock the parser import
-# Since I cannot easily import from crates/parsers/qwen.py because of directory structure and no __init__ maybe
-# I will just append path
+# Ensure crates is in path
+sys.path.insert(0, os.path.join(os.getcwd(), "crates"))
 
-sys.path.append(os.path.join(os.getcwd(), "crates"))
-from parsers.qwen import parse_line
+from backend import version_utils
 
-def test():
-    # Test case 1: Normal text
-    res = parse_line("Hello world")
-    print(f"Test 1: {res}")
-    assert len(res) == 1
-    assert res[0]["content"] == "Hello world"
+# Use version_utils for testing as it is the primary one used by API
+utils = version_utils
 
-    # Test case 2: JSON only
-    res = parse_line('{"content": "Hello json"}')
-    print(f"Test 2: {res}")
-    assert len(res) == 1
-    assert res[0]["content"] == "Hello json"
-
-    # Test case 3: Mixed content (The fix)
-    # Note: parse_line strips whitespace, so " 2 " becomes "2"
-    mixed = '这样就得到结果 2 了。 {"jsonrpc":"2.0","method":"session/update"}'
-    res = parse_line(mixed)
-    print(f"Test 3: {res}")
-    assert len(res) == 2
-    assert res[0]["content"] == "这样就得到结果 2 了。"
-    # The JSON part:
-    # _parse_single parses {"jsonrpc"...}
-    # It checks "content", "message", "result".
-    # This JSON has "method": "session/update" but no "params" with "update".
-    # So it should fall back to regex or text.
-    # Since it is valid JSON but _extract_text_from_dict might return "" if structure matches nothing known?
-    # No, if it falls through structure checks, it goes to regex.
-    # If regex fails, it returns {"status": "text", "content": text}
-    # So second part should be the JSON string itself (as text content) OR parsed if it matches known patterns.
-    # Wait, if it returns the JSON string as content, then ai-output will emit it, and frontend will display it.
-    # THIS IS BAD.
-
-    # Wait, I missed a crucial point.
-    # If `_parse_single` returns the raw JSON string as content, then `ai-output` emits it.
-    # My fix split the line, but if the JSON part is still returned as "content", it will still be displayed!
-
-    # Let's check `_parse_single` logic again.
-    # If it is valid JSON:
-    # It checks known fields.
-    # If known fields NOT found (like just {"jsonrpc":...}), what does it do?
-    # It falls through to regex checks.
-    # Regex checks: "content": ... "message": ...
-    # If not found, it returns `{"status": "text", "content": text, ...}`.
+def test_fix():
+    test_dir = os.path.abspath("test_workspace")
+    if os.path.exists(test_dir):
+        # Retry cleanup for Windows file locks
+        for _ in range(5):
+            try:
+                shutil.rmtree(test_dir)
+                break
+            except:
+                time.sleep(0.5)
+                
+    os.makedirs(test_dir)
     
-    # So `_parse_single` returns the RAW JSON TEXT if it doesn't understand the JSON.
-    # And `session.py` emits it to `ai-output`.
-    # And frontend displays it.
+    # Create files
+    os.makedirs(os.path.join(test_dir, "dir1"))
+    os.makedirs(os.path.join(test_dir, "excluded_dir"))
     
-    # So simply splitting is NOT enough if `_parse_single` doesn't hide "internal" JSONs.
-    # The JSON in the screenshot has "method": "session/update".
-    # My `_parse_single` handles "session/update":
-    # if method == "session/update":
-    #    upd = ...
-    #    content_obj = ...
-    #    chunk_val = ...
-    #    returns extracted content.
+    with open(os.path.join(test_dir, "file1.txt"), "w") as f: f.write("content1")
+    with open(os.path.join(test_dir, "dir1", "file2.txt"), "w") as f: f.write("content2")
+    with open(os.path.join(test_dir, "excluded.txt"), "w") as f: f.write("excluded content")
+    with open(os.path.join(test_dir, "excluded_dir", "file3.txt"), "w") as f: f.write("excluded dir content")
     
-    # If extracted content is EMPTY (e.g. text=""), then `_parse_single` returns what?
-    # Wait, `_parse_single` only returns if it finds something.
-    # If `extracted` is found (and truthy?), it returns.
-    # If `extracted` is empty string? `if extracted:` checks truthiness. Empty string is false.
-    # So if text is empty, it falls through!
+    # Create config
+    config_path = os.path.join(test_dir, "config.json")
+    with open(config_path, "w") as f:
+        json.dump({"excluded_paths": ["excluded.txt", "excluded_dir"]}, f)
+        
+    print(f"Config created at {config_path}")
     
-    # And eventually returns `{"status": "text", "content": text}`.
-    # So it returns the raw JSON!
+    # Init
+    print("Initializing backup...")
+    utils.init_backup(test_dir)
+    
+    # Create snapshot
+    print("Creating snapshot...")
+    success = utils.create_snapshot(test_dir, "Initial commit", "Init")
+    if not success:
+        print("Failed to create snapshot")
+        return
+        
+    # Verify Zip content
+    history = utils.get_history(test_dir)
+    latest_id = history[0]["id"]
+    zip_path = os.path.join(test_dir, ".history", f"{latest_id}.zip")
+    
+    import zipfile
+    print(f"Checking zip: {zip_path}")
+    with zipfile.ZipFile(zip_path, 'r') as z:
+        names = z.namelist()
+        print("Zip contents:", names)
+        if "excluded.txt" in names:
+            print("ERROR: excluded.txt found in zip")
+        if "excluded_dir/file3.txt" in names:
+            print("ERROR: excluded_dir/file3.txt found in zip")
+        if "file1.txt" not in names:
+            print("ERROR: file1.txt not found in zip")
+            
+    # Modify workspace
+    print("Modifying workspace...")
+    with open(os.path.join(test_dir, "file1.txt"), "w") as f: f.write("modified content")
+    os.remove(os.path.join(test_dir, "dir1", "file2.txt"))
+    # Modify excluded file to see if it persists
+    with open(os.path.join(test_dir, "excluded.txt"), "w") as f: f.write("modified excluded content")
+    
+    # Restore
+    print("Restoring...")
+    utils.restore_version(test_dir, latest_id)
+    
+    # Verify Restore
+    print("Verifying restore...")
+    with open(os.path.join(test_dir, "file1.txt"), "r") as f:
+        if f.read() != "content1":
+            print("ERROR: file1.txt not restored")
+        else:
+            print("file1.txt restored correctly")
+            
+    if not os.path.exists(os.path.join(test_dir, "dir1", "file2.txt")):
+        print("ERROR: file2.txt not restored")
+    else:
+        print("file2.txt restored correctly")
+        
+    with open(os.path.join(test_dir, "excluded.txt"), "r") as f:
+        content = f.read()
+        if content == "modified excluded content":
+            print("excluded.txt preserved correctly")
+        else:
+            print(f"ERROR: excluded.txt was overwritten/deleted. Content: {content}")
 
-    # I need to fix `_parse_single` to NOT return raw text if it was successfully parsed as JSON but had no content.
-    # OR, if it looks like JSON but has no content, return status="empty" or something?
-
-    pass
+    if os.path.exists(os.path.join(test_dir, "excluded_dir", "file3.txt")):
+         print("excluded_dir/file3.txt preserved correctly")
+    else:
+         print("ERROR: excluded_dir/file3.txt was deleted")
 
 if __name__ == "__main__":
-    test()
+    # Ensure crates is in path
+    sys.path.insert(0, os.path.join(os.getcwd(), "crates"))
+    test_fix()

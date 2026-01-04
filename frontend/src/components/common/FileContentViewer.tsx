@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   FileText,
   Copy,
@@ -10,6 +10,7 @@ import {
   ZoomOut,
   RotateCw,
   Image as ImageIcon,
+  MoveDiagonal2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../ui/button";
@@ -22,6 +23,7 @@ import { CodeMirrorViewer } from "./CodeMirrorViewer";
 import { ExcelViewer } from "./ExcelViewer";
 import { PDFViewer } from "./PDFViewer";
 import { ImageViewer } from "./ImageViewer";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 
 interface FileContentViewerProps {
   filePath: string | null;
@@ -53,8 +55,16 @@ export function FileContentViewer({
   const [saving, setSaving] = useState(false);
   const [forceViewAsText, setForceViewAsText] = useState(false);
 
+  // Drag & Resize states
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  const dialogContentRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ startX: number; startY: number; initialLeft: number; initialTop: number } | null>(null);
+  const resizeRef = useRef<{ startX: number; startY: number; initialWidth: number; initialHeight: number } | null>(null);
+
   // Image/PDF viewer states
   const [imageScale, setImageScale] = useState(1.0);
+
   const [imageRotation, setImageRotation] = useState(0);
   const [pdfScale, setPdfScale] = useState(1.0);
   const [imageData, setImageData] = useState<string | null>(null);
@@ -70,6 +80,120 @@ export function FileContentViewer({
   const getFileExtension = (path: string): string => {
     return path.split(".").pop()?.toLowerCase() || "";
   };
+
+  const isMarkdown = (path: string) => {
+    const ext = getFileExtension(path);
+    return ext === "md" || ext === "markdown";
+  };
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    // Prevent dragging if clicking buttons/controls or resize handle
+    if ((e.target as HTMLElement).closest("button") || (e.target as HTMLElement).closest(".no-drag") || (e.target as HTMLElement).closest(".resize-handle")) {
+      return;
+    }
+
+    e.preventDefault();
+
+    const dialogNode = dialogContentRef.current;
+    if (!dialogNode) return;
+
+    // If position is null (centered), calculate current computed position
+    let currentX = position?.x;
+    let currentY = position?.y;
+
+    if (currentX === undefined || currentY === undefined) {
+      const rect = dialogNode.getBoundingClientRect();
+      currentX = rect.left;
+      currentY = rect.top;
+      setPosition({ x: currentX, y: currentY });
+    }
+
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initialLeft: currentX,
+      initialTop: currentY,
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  };
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!dragRef.current) return;
+    
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    
+    setPosition({
+      x: dragRef.current.initialLeft + dx,
+      y: dragRef.current.initialTop + dy,
+    });
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    dragRef.current = null;
+    document.removeEventListener("mousemove", handleMouseMove);
+    document.removeEventListener("mouseup", handleMouseUp);
+  }, [handleMouseMove]);
+
+  // Resize Handlers
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const dialogNode = dialogContentRef.current;
+    if (!dialogNode) return;
+
+    // Initialize size state if it's null
+    let currentWidth = size?.width;
+    let currentHeight = size?.height;
+
+    if (currentWidth === undefined || currentHeight === undefined) {
+      const rect = dialogNode.getBoundingClientRect();
+      currentWidth = rect.width;
+      currentHeight = rect.height;
+      setSize({ width: currentWidth, height: currentHeight });
+    }
+
+    resizeRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initialWidth: currentWidth,
+      initialHeight: currentHeight,
+    };
+
+    document.addEventListener("mousemove", handleResizeMove);
+    document.addEventListener("mouseup", handleResizeUp);
+  };
+
+  const handleResizeMove = useCallback((e: MouseEvent) => {
+    if (!resizeRef.current) return;
+
+    const dx = e.clientX - resizeRef.current.startX;
+    const dy = e.clientY - resizeRef.current.startY;
+
+    setSize({
+      width: Math.max(320, resizeRef.current.initialWidth + dx), // Minimum width constraint
+      height: Math.max(200, resizeRef.current.initialHeight + dy), // Minimum height constraint
+    });
+  }, []);
+
+  const handleResizeUp = useCallback(() => {
+    resizeRef.current = null;
+    document.removeEventListener("mousemove", handleResizeMove);
+    document.removeEventListener("mouseup", handleResizeUp);
+  }, [handleResizeMove]);
+
+  // Clean up event listeners on unmount
+  useEffect(() => {
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener("mousemove", handleResizeMove);
+      document.removeEventListener("mouseup", handleResizeUp);
+    };
+  }, [handleMouseMove, handleMouseUp, handleResizeMove, handleResizeUp]);
 
   const getFileType = useCallback(
     (path: string): "excel" | "pdf" | "image" | "text" => {
@@ -295,13 +419,42 @@ export function FileContentViewer({
 
   if (!isOpen) return null;
 
+  // Compute dynamic styles for dragging and resizing
+  const dialogStyle: React.CSSProperties = {
+    // Position
+    ...(position ? {
+      top: position.y,
+      left: position.x,
+      transform: "none",
+    } : {}),
+    // Size
+    ...(size ? {
+      width: size.width,
+      height: size.height,
+      maxWidth: "none",
+      maxHeight: "none",
+    } : {
+      // Default size constraints when not resized manually
+      // We rely on className for initial sizing
+    }),
+  };
+
   return (
     <Dialog open={!!isOpen} onOpenChange={onClose}>
       <DialogContent
-        className={`max-w-4xl flex flex-col ${getFileType(filePath || "") === "pdf" ? "max-h-[95vh]" : "max-h-[80vh]"}`}
+        ref={dialogContentRef}
+        style={dialogStyle}
+        className={`flex flex-col ${
+          size 
+            ? "" // If manually resized, don't apply default size classes
+            : `${getFileType(filePath || "") === "pdf" ? "max-h-[95vh]" : "max-h-[80vh]"} max-w-4xl`
+        }`}
       >
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="flex items-center gap-2 justify-between">
+        <DialogHeader 
+          className="flex-shrink-0 cursor-move hover:bg-muted/30 transition-colors rounded-t-lg -mx-6 -mt-6 px-6 pt-6 pb-2"
+          onMouseDown={handleDragStart}
+        >
+          <DialogTitle className="flex items-center gap-2 justify-between select-none">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               {getFileIcon(filePath || "")}
               <span className="font-mono text-sm truncate" title={filePath}>
@@ -333,10 +486,12 @@ export function FileContentViewer({
               )}
             </div>
 
-            {/* File-type specific controls */}
-            {fileContent && (
-              <div className="flex items-center gap-1 flex-shrink-0">
-                {getFileType(fileContent.path) === "image" && (
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <div className="w-px h-4 bg-border mx-1" />
+              
+              {fileContent && (
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {getFileType(fileContent.path) === "image" && (
                   <>
                     <Button
                       variant="ghost"
@@ -478,6 +633,7 @@ export function FileContentViewer({
                   )}
               </div>
             )}
+            </div>
           </DialogTitle>
         </DialogHeader>
 
@@ -533,7 +689,7 @@ export function FileContentViewer({
               )}
 
               {/* File content */}
-              <div className="flex-1 min-h-0 overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                 {(() => {
                   const fileType = getFileType(fileContent.path);
 
@@ -591,8 +747,19 @@ export function FileContentViewer({
                   }
 
                   if (fileContent.content !== null) {
+                    // Handle Markdown Preview
+                    if (isMarkdown(fileContent.path) && !isEditing) {
+                      return (
+                        <div 
+                          className="flex-1 overflow-y-auto p-4 bg-background"
+                        >
+                          <MarkdownRenderer>{fileContent.content}</MarkdownRenderer>
+                        </div>
+                      );
+                    }
+
                     return (
-                      <div className="h-full overflow-auto">
+                      <div className="flex-1 overflow-auto">
                         <CodeMirrorViewer
                           code={isEditing ? editedContent : fileContent.content}
                           language={getLanguageFromExtension(fileContent.path)}
@@ -613,6 +780,13 @@ export function FileContentViewer({
               </div>
             </>
           ) : null}
+        </div>
+        {/* Resize Handle */}
+        <div
+          className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize flex items-center justify-center text-muted-foreground/50 hover:text-foreground z-50 resize-handle"
+          onMouseDown={handleResizeStart}
+        >
+          <MoveDiagonal2 className="w-4 h-4" />
         </div>
       </DialogContent>
     </Dialog>
