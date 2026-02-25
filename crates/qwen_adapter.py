@@ -66,13 +66,19 @@ class QwenProcess:
         # We use Popen without try-except as requested.
         # Assuming environment is sanity checked by caller or above check.
         # Use binary mode to avoid Windows OSError [Errno 22]
+        kwargs = {}
+        if os.name == "nt":
+            # CREATE_NO_WINDOW
+            kwargs["creationflags"] = 0x08000000
+
         self.process = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             env=env,
-            cwd=self.cwd
+            cwd=self.cwd,
+            **kwargs
         )
         self.pid = self.process.pid
 

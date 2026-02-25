@@ -3,9 +3,7 @@ import sys
 import threading
 import json
 import webview
-import subprocess
 import time
-import atexit
 from typing import Optional
 
 # Configuration
@@ -47,10 +45,20 @@ def get_icon_path() -> Optional[str]:
 
 def start_backend():
     print("Starting backend server on port 1858...")
-    # Use array for command to avoid shell injection and better handling
-    cmd = [sys.executable, "-m", "uvicorn", "server.main:app", "--port", "1858", "--host", "127.0.0.1"]
-    # No dev mode flags for start.py
-    return subprocess.Popen(cmd, cwd=BASE_DIR)
+    
+    def run_server():
+        try:
+            import uvicorn
+            # 动态导入以避免循环依赖或过早加载
+            from server.main import app
+            # 使用 app 对象而不是字符串，避免打包后找不到模块
+            uvicorn.run(app, host="127.0.0.1", port=1858, log_level="info")
+        except Exception as e:
+            print(f"Backend server failed to start: {e}")
+
+    t = threading.Thread(target=run_server, daemon=True)
+    t.start()
+    return t
 
 
 def set_window_icon(hwnd, icon_path):
@@ -172,21 +180,13 @@ def start_ticker(stop_event, window, icon_path=None):
     t.start()
 
 
-def cleanup(process):
-    print("Stopping backend server...")
-    process.terminate()
-    process.wait()
-
-
 if __name__ == "__main__":
     # Ensure debug mode is off
     if "FRONTEND_DEV" in os.environ:
         del os.environ["FRONTEND_DEV"]
 
     entry = get_entry_html()
-    backend_process = start_backend()
-    
-    atexit.register(cleanup, backend_process)
+    start_backend()
     
     icon_path = get_icon_path()
     window = webview.create_window(

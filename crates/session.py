@@ -98,6 +98,11 @@ def _spawn_cli(command: str, working_directory: str, model: str):
         args = [cmd_path]
     if model:
         args += ["--model", model]
+    
+    kwargs = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = 0x08000000
+
     proc = subprocess.Popen(
         args,
         stdin=subprocess.PIPE,
@@ -106,6 +111,7 @@ def _spawn_cli(command: str, working_directory: str, model: str):
         cwd=working_directory if working_directory else None,
         text=True,
         bufsize=1,
+        **kwargs
     )
     return proc
 
@@ -534,6 +540,11 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
     has_cli = exe != "" and (shutil.which(exe) is not None or os.path.basename(exe))
     if has_cli:
         _emit_progress(session_id, "validating_cli", "Validating CLI availability", 20, exe)
+        
+        kwargs = {}
+        if os.name == "nt":
+            kwargs["creationflags"] = 0x08000000
+
         proc = subprocess.Popen(
             cmd_list,
             stdin=subprocess.PIPE,
@@ -542,6 +553,7 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
             cwd=wd if wd else None,
             text=True,
             bufsize=1,
+            **kwargs
         )
         _emit_progress(session_id, "spawning_process", "Spawning process", 40, wd if wd else None)
         print(f"[SESSION] {session_id} spawn_cli backend={backend_name} exe={exe} cwd={wd} cmd={' '.join(cmd_list)}")

@@ -45,10 +45,16 @@ def resolve_qwen_executable() -> str:
     if _which("powershell"):
         # We use subprocess.run without timeout to avoid TimeoutExpired exception
         # Assuming this command returns quickly
+        
+        kwargs = {}
+        if os.name == "nt":
+            kwargs["creationflags"] = 0x08000000
+
         res = subprocess.run(
             ['powershell', '-Command', 'Get-Command qwen | Select-Object -ExpandProperty Source'],
             capture_output=True,
-            text=True
+            text=True,
+            **kwargs
         )
         if res.returncode == 0:
             ps_path = res.stdout.strip()

@@ -1,84 +1,80 @@
-# PyStand
+# QwenCode Desktop
 
-Python 独立部署环境。Python 3.5 以后，Windows 下面都有一个 Embedded Python 的独立 Python 运行环境，这个 PyStand 就是配合 Embedded Python 使用的。
+QwenCode Desktop 是一个专为开发者设计的 AI 辅助编程桌面环境。它基于 PyWebview 构建，集成了 Qwen 和 Gemini 大模型，提供具备上下文感知的智能对话、代码编辑、项目管理以及 Git 版本控制功能，旨在打造沉浸式的 AI 结对编程体验。
 
-## 特性介绍
+![License](https://img.shields.io/badge/license-MIT-blue.svg) ![Python](https://img.shields.io/badge/python-3.10+-blue.svg) ![React](https://img.shields.io/badge/react-18+-61DAFB.svg)
 
-- 使用 PyStand + PyQt5 精简版发布 PyQt 程序，打包大小只有 14MB。
-- 使用 PyStand 发布普通 Python 程序，打包大小仅 5MB。
+## ✨ 核心功能
 
-## 功能说明
+- **🤖 多模型智能对话**
+  - 集成 Qwen 和 Gemini 大语言模型，支持流式响应。
+  - 具备项目上下文感知能力，能够理解并引用项目中的文件内容。
 
-- Windows 下独立 Python 环境的启动器。
-- 自动加载 `PyStand.exe` 同级目录下面 `runtime` 子目录内的 Embedded Python。
-- 自动启动 `PyStand.exe` 同级目录下面的 `PyStand.int` 程序（Python 代码）。
-- 如果改名，会加载对应名称的 `.int` 文件，比如改为 `MyDemo.exe` 就会加载 `MyDemo.int`。
-- 窗口程序，无 Console，但是如果在 cmd.exe 内运行，可以看到 print 的内容。
-- 会自动添加 `PyStand.exe` 同级目录下的 `site-packages` 目录，库可以放到里面。
+- **🛠️ 全能项目管理**
+  - 内置文件资源管理器，支持多项目切换与管理。
+  - 提供全文搜索功能，快速定位代码片段。
 
-## 使用方式
+- **📝 沉浸式代码编辑**
+  - 集成 CodeMirror 编辑器，支持多种语言的语法高亮。
+  - 支持 Markdown、PDF、Excel、图片等多种格式文件的实时预览。
 
-- 用 CMake 生成 `PyStand.exe` （或者到 Release 里下个现成的）。
-- 下载 Python Embedded 版本，放到 `PyStand.exe` 所在目录的 runtime 子目录内。
-- 注意 Python Embedded 如果是 32 位，PyStand 配置 CMake 时也需要指明 `-A Win32`。
-- 在 `PyStand.exe` 所在目录创建 Python 源代码 PyStand.int。
-- 双击 `PyStand.exe` 就会运行 `PyStand.int` 里的代码。
-- 可以编译成命令行版方便调试，CMake 的时候加 `-DPYSTAND_CONSOLE=ON` 即可。
+- **🔄 版本控制集成**
+  - 内置 Git 管理面板，直观查看文件变更。
+  - 支持版本对比、回退、提交和撤销更改。
 
-## 常见问题
+- **🔌 扩展能力**
+  - 支持 MCP (Model Context Protocol) 协议，可扩展 AI 的工具调用能力。
+  - 内置终端，方便执行命令行操作。
 
-### 安装依赖
+## 🚀 快速开始
 
-用一个同 Embedded Python 相同版本的 Python 做一个 venv，然后 `pip` 独立安装好模块后将 site-packages 内对应的包复制到 `PyStand.exe` 的 `site-packages` 下直接使用。
+### 环境要求
 
-### 查看错误
+- Python 3.10 或更高版本
+- Node.js 18+ (用于构建前端)
+- pnpm (推荐) 或 npm
 
-如果在 `cmd.exe` 内部运行 `PyStand.exe` 可以看到标准输出和标准错误。不过推荐的做法是 PyStand.int 里尽量精简，比如：
+### 1. 克隆项目
 
-```python
-import main
-main.main()
+```bash
+git clone https://github.com/your-username/qwencode-desktop.git
+cd qwencode-desktop
 ```
 
-把你的主程序写到 `main.py` 里面，用你常规方式把程序调试通顺了，然后再在 `PyStand.int` 里 `import` 一下即可，实在 `PyStand.int` 有错误，再到命令行下面去运行 `PyStand.exe` 查看错误。
+### 2. 构建前端
 
-### MessageBox
+```bash
+cd frontend
+pnpm install
+pnpm build
+cd ..
+```
 
-PyStand 添加了一个 `os.MessageBox(msg, title)` 的接口，可以用来简单显示个对话框。
+### 3. 安装后端依赖
 
-### 更换图标
+```bash
+pip install -r requirements.txt
+```
 
-可以替换 `appicon.ico` 文件并重新编译 `PyStand.exe` ，或者使用 `Resource Hacker` 直接
-替换 `Release` 内下载的 `PyStand.exe` 文件的程序图标。
+### 4. 启动应用
 
-### 脚本组织
+```bash
+python start.py
+```
 
-可以在 `PyStand.exe` 同级目录新建一个 `script` 文件夹，将脚本放进去，`PyStand.int` 里面就是添加一下 `sys.path` 然后 `import` 即可。
+## 📂 项目结构
 
-发布打包时将 `script` 文件夹用 `zip` 压缩成 `script.egg` 文件，`PyStand.int` 里检测到该文件存在就加入到 `sys.path`，然后再 `import`。
+- `crates/` - 后端核心逻辑 (Python 模块)
+  - `backend/` - API 接口与业务逻辑
+  - `parsers/` - 模型输出解析器
+- `frontend/` - 前端用户界面 (React + Vite)
+- `server/` - 后端 Web 服务 (FastAPI)
+- `start.py` - 应用启动入口
 
-### 静态入口
+## 📄 许可证
 
-部分网友有个需求，担心用户把可执行文件改名，但 `.int` 文件没改名导致出错的问题，因此增加了一个名为 `_pystand_static.int` 的入口文件，在 `PyStand` 主程序启动时，如果检测到在主程序同目录下存在该文件，则会优先加载，不存在才回去找 `PyStand.int` 文件。
+本项目采用 [MIT 许可证](LICENSE) 开源。
 
-这样主程序就允许随意改名了，只要把入口写在 `_pystand_static.int` 中即可。
+---
 
-## 使用例子
-
-这个回答里我说了详细的用法以及 PyInstaller 的优缺点：
-
-- [Skywind Inside：打包 PyQt 应用的最佳方案是什么？](https://skywind.me/blog/archives/3002)
-
-更多的用法可以见 Release 下面的例子。
-
-## 常见问题
-
-其他用户使用中碰到什么疑问？如何解决的？
-
-- [Wiki：常见问题](https://github.com/skywind3000/PyStand/wiki/Frequently-Asked-Questions)
-
-碰到疑问不妨快速过一下。
-
-
-
-
+*注：本项目使用了 [PyStand](https://github.com/skywind3000/PyStand) 进行打包分发。关于 PyStand 的详细说明请参考 [README_PyStand.md](README_PyStand.md)。*
