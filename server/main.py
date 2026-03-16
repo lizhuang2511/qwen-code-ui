@@ -120,6 +120,29 @@ def api_delete_project(req: DeleteProjectRequest) -> Dict[str, Any]:
     projects.delete_project(req.project_id)
     return {"ok": True}
 
+@app.get("/api/tags")
+def api_get_tags() -> List[str]:
+    return projects.get_all_tags()
+
+class TagRequest(BaseModel):
+    tag: str
+
+@app.post("/api/tags")
+def api_add_tag(req: TagRequest) -> List[str]:
+    return projects.add_tag(req.tag)
+
+@app.delete("/api/tags")
+def api_delete_tag(tag: str) -> List[str]:
+    return projects.delete_tag(tag)
+
+class ToggleTagRequest(BaseModel):
+    projectId: str
+    tag: str
+
+@app.post("/api/project/toggle-tag")
+def api_toggle_tag(req: ToggleTagRequest) -> Dict[str, Any]:
+    return projects.toggle_project_tag(req.projectId, req.tag)
+
 @app.websocket("/api/ws")
 async def websocket_endpoint(ws: WebSocket):
     # Ensure we have a reference to the running loop for the bridge

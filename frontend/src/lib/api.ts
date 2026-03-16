@@ -213,6 +213,12 @@ export interface API {
   }>;
   get_mcp_config(): Promise<any>;
   save_mcp_config(params: any): Promise<boolean>;
+  check_mcp_server(params: { config: any }): Promise<{ success: boolean; message: string; error?: string }>;
+  launch_qwen_mcp(params?: { path?: string }): Promise<boolean>;
+  get_tags(): Promise<string[]>;
+  add_tag(params: { tag: string }): Promise<string[]>;
+  delete_tag(params: { tag: string }): Promise<string[]>;
+  toggle_project_tag(params: { projectId: string; tag: string }): Promise<{ tags: string[] }>;
 }
 
 export type APICommand = keyof API;

@@ -357,6 +357,36 @@ export const webApi: API = {
     const response = await apiClient.post<boolean>("/save-mcp-config", params);
     return response.data;
   },
+
+  async check_mcp_server(params) {
+    const response = await apiClient.post<{ success: boolean; message: string; error?: string }>("/check-mcp-server", params);
+    return response.data;
+  },
+
+  async launch_qwen_mcp(params?: { path?: string }): Promise<boolean> {
+    const response = await apiClient.post("/mcp/launch", params);
+    return response.data;
+  },
+
+  async get_tags() {
+    const response = await apiClient.get<string[]>("/tags");
+    return response.data;
+  },
+
+  async add_tag(params: { tag: string }) {
+    const response = await apiClient.post<string[]>("/tags", params);
+    return response.data;
+  },
+
+  async delete_tag(params: { tag: string }) {
+    const response = await apiClient.delete<string[]>("/tags", { params: { tag: params.tag } });
+    return response.data;
+  },
+
+  async toggle_project_tag(params: { projectId: string; tag: string }) {
+    const response = await apiClient.post<{ tags: string[] }>("/project/toggle-tag", params);
+    return response.data;
+  }
 };
 
 export interface RecentChat {
@@ -434,6 +464,7 @@ export interface ProjectMetadata {
 export interface EnrichedProject {
   sha256: string;
   root_path: string;
+  tags?: string[];
   metadata: ProjectMetadata;
 }
 

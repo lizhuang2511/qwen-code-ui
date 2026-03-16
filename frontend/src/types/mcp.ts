@@ -25,6 +25,7 @@ export interface McpServerConfigBase {
   cwd?: string;
   timeout?: number;
   trust?: boolean;
+  enabled?: boolean; // Persisted enabled state
   includeTools?: string[];
   excludeTools?: string[];
   oauth?: McpOAuthConfig;

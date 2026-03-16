@@ -1,10 +1,11 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { FolderTree, Settings as SettingsIcon, History, MessageSquarePlus } from "lucide-react";
+import { FolderTree, Settings as SettingsIcon, History, MessageSquarePlus, Play } from "lucide-react";
 import { SmartLogo } from "../branding/SmartLogo";
 import { DesktopText } from "../branding/DesktopText";
 import { SidebarTrigger } from "../ui/sidebar";
 import { Button } from "../ui/button";
+import { api } from "../../lib/api";
 
 interface AppHeaderProps {
   onDirectoryPanelToggle?: () => void;
@@ -16,6 +17,7 @@ interface AppHeaderProps {
   onReturnToDashboard?: () => void;
   onOpenSettings?: () => void;
   onNewChat?: () => void;
+  currentProjectPath?: string;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -28,6 +30,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onReturnToDashboard,
   onOpenSettings,
   onNewChat,
+  currentProjectPath,
 }) => {
   const { t } = useTranslation();
 
@@ -109,6 +112,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 <History className="h-4 w-4" />
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                if (currentProjectPath) {
+                  api.launch_qwen_mcp({ path: currentProjectPath });
+                } else {
+                  api.launch_qwen_mcp();
+                }
+              }}
+              title={t("directoryPanel.launchQwen", "Launch Qwen MCP")}
+            >
+              <Play className="h-4 w-4" />
+            </Button>
             {onOpenSettings && (
               <Button
                 variant="ghost"

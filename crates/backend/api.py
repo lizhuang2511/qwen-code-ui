@@ -394,7 +394,24 @@ class Api:
                     content = f.read()
                     data = json.loads(content)
                     if isinstance(data, dict):
-                        return data
+                        # Combine mcpServers and disabledMcpServers for frontend
+                        mcp_servers = data.get("mcpServers", {})
+                        disabled_servers = data.get("disabledMcpServers", {})
+                        
+                        combined = {}
+                        if isinstance(mcp_servers, dict):
+                            for k, v in mcp_servers.items():
+                                if isinstance(v, dict):
+                                    v["enabled"] = True
+                                    combined[k] = v
+                                    
+                        if isinstance(disabled_servers, dict):
+                            for k, v in disabled_servers.items():
+                                if isinstance(v, dict):
+                                    v["enabled"] = False
+                                    combined[k] = v
+                                    
+                        return {"mcpServers": combined}
         return {"mcpServers": {}}
 
     def save_mcp_config(self, params: Dict[str, Any]) -> bool:
@@ -414,10 +431,139 @@ class Api:
         if not isinstance(current_config, dict):
             current_config = {}
             
-        mcp_servers = params.get("mcpServers", {})
-        current_config["mcpServers"] = mcp_servers
+        # Split input into enabled (mcpServers) and disabled (disabledMcpServers)
+        input_servers = params.get("mcpServers", {})
+        enabled_servers = {}
+        disabled_servers = {}
+        
+        for name, config in input_servers.items():
+            if not isinstance(config, dict):
+                continue
+                
+            # Check enabled status
+            is_enabled = config.get("enabled", True)
+            
+            # Remove enabled flag for storage to keep config clean
+            clean_config = config.copy()
+            if "enabled" in clean_config:
+                del clean_config["enabled"]
+                
+            if is_enabled:
+                enabled_servers[name] = clean_config
+            else:
+                disabled_servers[name] = clean_config
+        
+        current_config["mcpServers"] = enabled_servers
+        current_config["disabledMcpServers"] = disabled_servers
         
         with open(path, "w", encoding="utf-8") as f:
             json.dump(current_config, f, indent=2, ensure_ascii=False)
             
         return True
+
+    def check_mcp_server(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        config = params.get("config", {})
+        if not config:
+            return {"success": False, "message": "No configuration provided"}
+            
+        try:
+            # Check based on type
+            if "command" in config:
+                # Stdio
+                cmd = config.get("command", "")
+                if not cmd:
+                    return {"success": False, "message": "Command is empty"}
+                
+                # Check if executable exists
+                exe = shutil.which(cmd)
+                if not exe:
+                    # It might be a full path
+                    if os.path.isfile(cmd) and os.access(cmd, os.X_OK):
+                        exe = cmd
+                    elif os.path.isfile(cmd):
+                         # Exists but maybe not executable (e.g. script file), checking extension
+                         exe = cmd
+                    else:
+                         # On Windows, shutil.which handles PATHEXT.
+                         # If cmd has no extension, it might be found.
+                         # If not found, return error.
+                        return {"success": False, "message": f"Command not found: {cmd}"}
+                
+                return {"success": True, "message": f"Executable found at {exe}"}
+                
+            elif "url" in config or "httpUrl" in config:
+                # SSE or HTTP
+                url = config.get("url") or config.get("httpUrl")
+                if not url:
+                    return {"success": False, "message": "URL is empty"}
+                
+                try:
+                    from urllib.request import Request, urlopen
+                    from urllib.error import URLError, HTTPError
+                    
+                    # Try a simple GET request
+                    req = Request(url, method="GET")
+                    # Set a timeout
+                    with urlopen(req, timeout=5) as response:
+                        return {"success": True, "message": f"Connected to {url} (Status: {response.status})"}
+                             
+                except HTTPError as e:
+                     # 405 Method Not Allowed is also a sign of life
+                     if e.code == 405:
+                         return {"success": True, "message": f"Connected to {url} (Status: {e.code})"}
+                     return {"success": False, "message": f"HTTP Error: {e.code} {e.reason}"}
+                except URLError as e:
+                    return {"success": False, "message": f"Connection failed: {e.reason}"}
+                except Exception as e:
+                     return {"success": False, "message": f"Error checking URL: {str(e)}"}
+            
+            else:
+                return {"success": False, "message": "Unknown server type"}
+                
+        except Exception as e:
+            return {"success": False, "message": f"Validation error: {str(e)}"}
+
+    def launch_qwen_mcp(self, params: Optional[Dict[str, Any]] = None) -> bool:
+        try:
+            cwd = None
+            if params and isinstance(params, dict):
+                cwd = params.get("path")
+                
+            if sys.platform == 'win32':
+                cmd = 'start cmd /k "qwen"'
+                if cwd and os.path.exists(cwd):
+                    # /d 参数用于切换驱动器（如果需要）
+                    cmd = f'start cmd /k "cd /d {cwd} && qwen"'
+                subprocess.Popen(cmd, shell=True)
+            elif sys.platform == 'darwin':
+                # Try to open in Terminal on macOS
+                script = 'tell application "Terminal" to do script "qwen"'
+                if cwd and os.path.exists(cwd):
+                    script = f'tell application "Terminal" to do script "cd {cwd} && qwen"'
+                subprocess.Popen(['osascript', '-e', script])
+            else:
+                # Try common terminals on Linux
+                terminals = ['gnome-terminal', 'x-terminal-emulator', 'xterm']
+                for term in terminals:
+                    if shutil.which(term):
+                        bash_cmd = 'bash -c "qwen; exec bash"'
+                        if cwd and os.path.exists(cwd):
+                            bash_cmd = f'bash -c "cd {cwd} && qwen; exec bash"'
+                        subprocess.Popen([term, '-e', bash_cmd])
+                        break
+            return True
+        except Exception as e:
+            print(f"Failed to launch qwen: {e}")
+            return False
+
+    def get_tags(self) -> List[str]:
+        return projects.get_all_tags()
+
+    def add_tag(self, params: Dict[str, Any]) -> List[str]:
+        return projects.add_tag(params.get("tag", ""))
+
+    def delete_tag(self, params: Dict[str, Any]) -> List[str]:
+        return projects.delete_tag(params.get("tag", ""))
+
+    def toggle_project_tag(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        return projects.toggle_project_tag(params.get("projectId", ""), params.get("tag", ""))

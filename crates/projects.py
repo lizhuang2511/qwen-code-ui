@@ -15,7 +15,10 @@ def _ensure_data_dir():
 
 def hash_path(path: str) -> str:
     abs_path = os.path.abspath(path)
-    return hashlib.sha256(abs_path.encode("utf-8")).hexdigest()
+    norm_path = os.path.normpath(abs_path)
+    if os.name == 'nt':
+        norm_path = norm_path.lower()
+    return hashlib.sha256(norm_path.encode("utf-8")).hexdigest()
 
 def ensure_project(path: str) -> str:
     pid = hash_path(path)
@@ -45,6 +48,7 @@ def list_enriched_projects() -> List[Dict]:
         enriched.append({
             "sha256": it.get("id",""),
             "root_path": it.get("path",""),
+            "tags": it.get("tags", []),
             "metadata": {
                 "path": it.get("path",""),
                 "sha256": it.get("id",""),
@@ -52,6 +56,56 @@ def list_enriched_projects() -> List[Dict]:
             },
         })
     return enriched
+
+def get_all_tags() -> List[str]:
+    _ensure_data_dir()
+    raw = json.loads(PROJECTS_FILE.read_text(encoding="utf-8"))
+    return raw.get("tags", [])
+
+def add_tag(tag: str) -> List[str]:
+    _ensure_data_dir()
+    raw = json.loads(PROJECTS_FILE.read_text(encoding="utf-8"))
+    tags = raw.get("tags", [])
+    if tag not in tags:
+        tags.append(tag)
+        raw["tags"] = tags
+        PROJECTS_FILE.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    return tags
+
+def delete_tag(tag: str) -> List[str]:
+    _ensure_data_dir()
+    raw = json.loads(PROJECTS_FILE.read_text(encoding="utf-8"))
+    tags = raw.get("tags", [])
+    if tag in tags:
+        tags.remove(tag)
+        raw["tags"] = tags
+        # Also remove this tag from all projects
+        for item in raw.get("items", []):
+            if "tags" in item and tag in item["tags"]:
+                item["tags"].remove(tag)
+        PROJECTS_FILE.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    return tags
+
+def toggle_project_tag(project_id: str, tag: str) -> Dict:
+    _ensure_data_dir()
+    raw = json.loads(PROJECTS_FILE.read_text(encoding="utf-8"))
+    items = raw.get("items", [])
+    target_item = None
+    for item in items:
+        if item.get("id") == project_id:
+            target_item = item
+            break
+    
+    if target_item:
+        current_tags = target_item.get("tags", [])
+        if tag in current_tags:
+            current_tags.remove(tag)
+        else:
+            current_tags.append(tag)
+        target_item["tags"] = current_tags
+        PROJECTS_FILE.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+        return {"tags": current_tags}
+    return {"tags": []}
 
 def delete_project(project_id: str) -> None:
     _ensure_data_dir()

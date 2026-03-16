@@ -441,12 +441,14 @@ function RootLayoutContent() {
 
       setIsContinuingConversation(true);
       try {
-        const newTitle = `(Continued) ${conversationToContinue.title}`;
+        // Reuse existing title and ID to keep conversation context
+        const title = conversationToContinue.title;
 
         await startNewConversation(
-          newTitle,
+          title,
           conversationToContinue.workingDirectory,
-          conversationToContinue.messages
+          conversationToContinue.messages,
+          conversationToContinue.id
         );
       } finally {
         setIsContinuingConversation(false);
@@ -578,6 +580,7 @@ function RootLayoutContent() {
                 }}
                 onOpenSettings={() => setIsSettingsOpen(true)}
                 onNewChat={handleNewConversationFromDirectory}
+                currentProjectPath={workingDirectory}
               />
             </div>
 

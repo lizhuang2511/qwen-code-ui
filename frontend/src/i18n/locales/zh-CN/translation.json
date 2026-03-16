@@ -121,7 +121,14 @@
     "failedToDeleteDiscussion": "删除讨论失败。",
     "deleteDiscussionConfirm": "您确定要删除讨论“{{name}}”吗？此操作无法撤销。",
     "deleteProjectConfirm": "您确定要删除项目“{{name}}”吗？此操作无法撤销。",
-    "failedToDelete": "删除项目失败。"
+    "failedToDelete": "删除项目失败。",
+    "categoryTags": "分类标签",
+    "manageTags": "管理标签",
+    "manageTagsDesc": "选择标签筛选项目。右键点击删除。",
+    "newTagName": "新标签名称",
+    "all": "全部",
+    "noTagsAvailable": "无可用标签",
+    "toggleTag": "切换标签"
   },
 
   "conversations": {

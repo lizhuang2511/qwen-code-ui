@@ -54,7 +54,25 @@ export const useConversationManager = () => {
         // For new conversations, use the id as both id and timestamp
         metadata: { timestamp: id, chatId: id },
       };
-      setConversations((prev) => [newConversation, ...prev]);
+      setConversations((prev) => {
+        const existingIndex = prev.findIndex((c) => c.id === id);
+        if (existingIndex !== -1) {
+          // If conversation exists, update it and move to top
+          const updated = [...prev];
+          // Preserve existing metadata if needed, but ensure it's active
+          const existing = updated[existingIndex];
+          newConversation.metadata = {
+             ...existing.metadata,
+             ...newConversation.metadata
+          };
+          // If reusing ID, we might want to keep isNew status from existing? 
+          // But usually restarting means it's "new" session process.
+          
+          updated.splice(existingIndex, 1);
+          return [newConversation, ...updated];
+        }
+        return [newConversation, ...prev];
+      });
       // Note: Don't set active conversation here, let the caller do it
       return newConversation;
     },

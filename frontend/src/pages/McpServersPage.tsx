@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
-import { FileText, Package, Trash2, ArrowLeft } from "lucide-react";
+import { FileText, Package, Trash2, ArrowLeft, Play } from "lucide-react";
 import {
   McpServerEntry,
   isStdioConfig,
@@ -25,11 +25,14 @@ import { useBackend } from "../contexts/BackendContext";
 import { getBackendText } from "../utils/backendText";
 import { useTranslation } from "react-i18next";
 
+import { Switch } from "../components/ui/switch";
 import { api } from "../lib/api";
+import { AlertCircle, CheckCircle2, RefreshCw, Loader2 } from "lucide-react";
 
 export function McpServersPage() {
   const { t } = useTranslation();
   const [servers, setServers] = useState<McpServerEntry[]>([]);
+  const [serverStatuses, setServerStatuses] = useState<Record<string, { alive: boolean; checking: boolean; message?: string }>>({});
   const [settingsFilePath, setSettingsFilePath] = useState<string>("~/.qwen/settings.json");
   const [isLoading, setIsLoading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -52,6 +55,26 @@ export function McpServersPage() {
     }
   }, [settingsFilePath]);
 
+  const checkServerStatus = useCallback(async (server: McpServerEntry) => {
+    setServerStatuses(prev => ({
+      ...prev,
+      [server.id]: { alive: false, checking: true }
+    }));
+    
+    try {
+      const result = await api.check_mcp_server({ config: server.config });
+      setServerStatuses(prev => ({
+        ...prev,
+        [server.id]: { alive: result.success, checking: false, message: result.message }
+      }));
+    } catch (error) {
+      setServerStatuses(prev => ({
+        ...prev,
+        [server.id]: { alive: false, checking: false, message: String(error) }
+      }));
+    }
+  }, []);
+
   const loadSettingsFromFile = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -62,10 +85,17 @@ export function McpServersPage() {
             id: name,
             name: name,
             config: serverConfig,
-            enabled: true,
+            enabled: serverConfig.enabled !== false,
           })
         );
         setServers(loadedServers);
+        
+        // Check status for enabled servers
+        loadedServers.forEach(s => {
+            if (s.enabled) {
+                checkServerStatus(s);
+            }
+        });
       } else {
         setServers([]);
       }
@@ -74,7 +104,7 @@ export function McpServersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedBackend, t]);
+  }, [selectedBackend, t, checkServerStatus]);
 
   // Load settings file path on component mount and when backend changes
   useEffect(() => {
@@ -94,7 +124,7 @@ export function McpServersPage() {
     try {
       const mcpServers: Record<string, any> = {};
       updatedServers.forEach(server => {
-        mcpServers[server.name] = server.config;
+        mcpServers[server.name] = { ...server.config, enabled: server.enabled };
       });
       
       await api.save_mcp_config({ mcpServers });
@@ -103,6 +133,23 @@ export function McpServersPage() {
       // Revert state if needed, or show error
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleToggleServer = (server: McpServerEntry, checked: boolean) => {
+    const updatedServers = servers.map((s) =>
+      s.id === server.id ? { ...s, enabled: checked } : s
+    );
+    saveServersToFile(updatedServers);
+    
+    if (checked) {
+        checkServerStatus(server);
+    } else {
+        setServerStatuses(prev => {
+            const next = { ...prev };
+            delete next[server.id];
+            return next;
+        });
     }
   };
 
@@ -135,6 +182,14 @@ export function McpServersPage() {
   const cancelDeleteServer = () => {
     setDeleteDialogOpen(false);
     setServerToDelete(null);
+  };
+
+  const handleLaunchQwenTest = async () => {
+    try {
+      await api.launch_qwen_mcp();
+    } catch (error) {
+      console.error("Failed to launch Qwen:", error);
+    }
   };
 
   // Helper function to format server details
@@ -212,8 +267,8 @@ export function McpServersPage() {
   };
 
   return (
-    <div className="w-full">
-      <div className="mx-auto w-full max-w-4xl px-6 py-8 flex-1 flex flex-col">
+    <div className="w-full h-full flex flex-col">
+      <div className="mx-auto w-full max-w-4xl px-6 py-8 flex-1 flex flex-col overflow-hidden">
         {/* Page Header */}
         <div className="mb-6">
           <button
@@ -225,12 +280,47 @@ export function McpServersPage() {
             <ArrowLeft className="h-4 w-4 mr-2" aria-hidden="true" />
             <span>{t("navigation.backToHome")}</span>
           </button>
-          <h1 className="text-2xl font-bold mb-2">{t("mcp.title")}</h1>
-          <p className="text-muted-foreground">{t("mcp.description")}</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold mb-2">{t("mcp.title")}</h1>
+              <p className="text-muted-foreground">{t("mcp.description")}</p>
+            </div>
+            {/* Top action buttons */}
+            {servers.length > 0 && (
+              <div className="flex gap-3">
+                <Button
+                  variant="secondary"
+                  className="flex items-center gap-2"
+                  onClick={handleLaunchQwenTest}
+                >
+                  <Play className="h-4 w-4" />
+                  启动 qwen 安测
+                </Button>
+                <AddMcpServerDialog
+                  trigger={
+                    <Button className="flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      {t("mcp.addNewServer")}
+                    </Button>
+                  }
+                  onServerAdd={handleAddServer}
+                />
+                <PasteJsonDialog
+                  trigger={
+                    <Button variant="outline" className="flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      {t("mcp.pasteJson")}
+                    </Button>
+                  }
+                  onServersAdd={handleAddServers}
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto min-h-0">
           {isLoading ? (
             <div className="flex items-center justify-center p-8">
               <div className="text-sm text-muted-foreground">
@@ -247,6 +337,14 @@ export function McpServersPage() {
                 {backendText.mcpCapabilities} {t("mcp.addFirstServer")}.
               </p>
               <div className="flex gap-3">
+                <Button
+                  variant="secondary"
+                  className="flex items-center gap-2"
+                  onClick={handleLaunchQwenTest}
+                >
+                  <Play className="h-4 w-4" />
+                  启动 qwen 安测
+                </Button>
                 <AddMcpServerDialog
                   trigger={
                     <Button className="flex items-center gap-2">
@@ -300,9 +398,42 @@ export function McpServersPage() {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
+                          {/* Status Indicator */}
+                          {server.enabled && (
+                            <div className="flex items-center mr-2" title={serverStatuses[server.id]?.message || ""}>
+                                {serverStatuses[server.id]?.checking ? (
+                                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                ) : serverStatuses[server.id]?.alive ? (
+                                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                ) : (
+                                    <AlertCircle className="h-4 w-4 text-red-500" />
+                                )}
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-2 mr-2">
+                            <Switch
+                              checked={server.enabled}
+                              onCheckedChange={(checked) => handleToggleServer(server, checked)}
+                            />
+                            <span className="text-sm text-muted-foreground hidden sm:inline-block">
+                              {server.enabled ? t("common.enabled") : t("common.disabled")}
+                            </span>
+                          </div>
+
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
+                            onClick={() => checkServerStatus(server)}
+                            disabled={!server.enabled || serverStatuses[server.id]?.checking}
+                            title="Check Status"
+                          >
+                             <RefreshCw className={`h-4 w-4 ${serverStatuses[server.id]?.checking ? "animate-spin" : ""}`} />
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => handleDeleteServer(server)}
                             className="text-red-500 hover:text-red-700 hover:bg-red-50"
                           >
@@ -327,30 +458,6 @@ export function McpServersPage() {
             </div>
           )}
         </div>
-
-        {/* Bottom action buttons - fixed at bottom */}
-        {servers.length > 0 && (
-          <div className="flex justify-end gap-3 pt-4 mt-4">
-            <AddMcpServerDialog
-              trigger={
-                <Button className="flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  {t("mcp.addNewServer")}
-                </Button>
-              }
-              onServerAdd={handleAddServer}
-            />
-            <PasteJsonDialog
-              trigger={
-                <Button variant="outline" className="flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  {t("mcp.pasteJson")}
-                </Button>
-              }
-              onServersAdd={handleAddServers}
-            />
-          </div>
-        )}
 
         {/* Delete Confirmation Dialog */}
         <Dialog open={!!deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

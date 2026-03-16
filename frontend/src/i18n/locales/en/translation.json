@@ -125,6 +125,13 @@
     "deleteDiscussionConfirm": "Are you sure you want to delete the discussion \"{{name}}\"? This action cannot be undone.",
     "deleteProjectConfirm": "Are you sure you want to delete the project \"{{name}}\"? This action cannot be undone.",
     "failedToDelete": "Failed to delete project.",
+    "categoryTags": "Category Tags",
+    "manageTags": "Manage Tags",
+    "manageTagsDesc": "Select a tag to filter projects. Right-click to delete.",
+    "newTagName": "New Tag Name",
+    "all": "All",
+    "noTagsAvailable": "No tags available",
+    "toggleTag": "Toggle Tag",
     "chatSessionLoadedSuccessfully": "Chat session loaded successfully."
   },
 
