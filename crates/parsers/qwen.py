@@ -37,6 +37,8 @@ def _parse_single(text: str) -> Dict:
             # Common fields
             if "result" in data:
                 val = data.get("result")
+                if isinstance(val, dict) and "stopReason" in val:
+                    return {"status": "turn_finished", "content": val, "metadata": {"source": "jsonl"}, "raw": text}
                 if isinstance(val, str):
                     return {"status": "parsed", "content": val, "metadata": {"source": "jsonl"}, "raw": text}
                 if isinstance(val, dict):

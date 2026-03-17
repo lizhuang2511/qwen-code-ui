@@ -37,6 +37,8 @@ export const useMessageHandler = ({
   fetchProcessStatuses,
 }: UseMessageHandlerProps) => {
   const [input, setInput] = useState("");
+  const [approvalMode, setApprovalMode] = useState<string>("default");
+  const conversationModes = React.useRef<Record<string, string>>({});
   const { selectedBackend, getApiConfig, state: backendState } = useBackend();
 
   const handleInputChange = useCallback(
@@ -77,6 +79,78 @@ export const useMessageHandler = ({
       }
     },
     [selectedModel, updateConversation]
+  );
+
+  const handleApprovalModeChange = useCallback(
+    async (newMode: string) => {
+      setApprovalMode(newMode);
+      
+      if (!activeConversation) {
+        return;
+      }
+      
+      const convId = activeConversation;
+      const currentMode = conversationModes.current[convId] || "default";
+      
+      if (newMode !== currentMode) {
+        console.log(`[useMessageHandler] Restarting session to switch mode from ${currentMode} to ${newMode} for session ${convId}`);
+        
+        try {
+          // Get backend configuration to ensure consistency
+          const apiConfig = getApiConfig();
+          const qwenCfg = backendState.configs.qwen;
+          
+          // Determine yolo setting based on mode
+          const isYolo = newMode === "yolo" || newMode === "auto-edit";
+          
+          const backendConfig = {
+            api_key: apiConfig?.api_key || "",
+            base_url: apiConfig?.base_url || "https://openrouter.ai/api/v1",
+            model: qwenCfg.model || apiConfig?.model || "qwen/qwen3-coder:free",
+            yolo: isYolo,
+          };
+
+          // Find current conversation to get working directory
+          const existing = conversations.find((c) => c.id === convId);
+          const wd = existing?.workingDirectory || ".";
+
+          // Restart session with new configuration
+          // This will kill the old process in backend and start a new one with the same ID
+          await api.start_session({
+            sessionId: convId,
+            workingDirectory: wd,
+            model: selectedModel,
+            backend: selectedBackend,
+            backendConfig: backendConfig,
+            // Pass other configs as undefined to rely on backend handling
+          });
+          
+          conversationModes.current[convId] = newMode;
+          
+          // Optional: Add a system message to UI to indicate restart
+          updateConversation(convId, (conv) => {
+            conv.messages.push({
+              id: Date.now().toString(),
+              parts: [{ type: "text", text: `🔄 **System:** Session restarted in **${newMode}** mode.` }],
+              sender: "assistant",
+              timestamp: new Date(),
+            });
+          });
+
+        } catch (error) {
+          console.error("Failed to restart session for approval mode:", error);
+           updateConversation(convId, (conv) => {
+            conv.messages.push({
+              id: Date.now().toString(),
+              parts: [{ type: "text", text: `❌ **Error:** Failed to switch mode: ${error}` }],
+              sender: "assistant",
+              timestamp: new Date(),
+            });
+          });
+        }
+      }
+    },
+    [activeConversation, conversations, getApiConfig, backendState.configs.qwen, selectedModel, selectedBackend, updateConversation]
   );
 
   const handleSendMessage = useCallback(
@@ -161,11 +235,15 @@ export const useMessageHandler = ({
           // Always set backend_config for Qwen, even with OAuth
           // This ensures the backend knows to use qwen CLI instead of gemini CLI
           const qwenCfg = backendState.configs.qwen;
+          
+          // Determine yolo based on current approvalMode state
+          const isYolo = approvalMode === "yolo" || approvalMode === "auto-edit";
+          
           backendConfig = {
             api_key: apiConfig?.api_key || "", // Empty string if OAuth
             base_url: apiConfig?.base_url || "https://openrouter.ai/api/v1",
             model: qwenCfg.model || apiConfig?.model || "qwen/qwen3-coder:free",
-            yolo: qwenCfg.yolo,
+            yolo: isYolo,
           };
           console.log(
             "🔍 [useMessageHandler] Setting backend_config for Qwen:",
@@ -222,6 +300,24 @@ export const useMessageHandler = ({
           });
         }
 
+        // Send approval mode command if needed (fallback check)
+        const currentMode = conversationModes.current[convId] || "default";
+        // If mode in UI (approvalMode) is different from what we think backend has (currentMode),
+        // sync it now. This handles cases where session wasn't active when user changed dropdown.
+        if (approvalMode !== currentMode) {
+          console.log(`[useMessageHandler] Syncing approval mode before message: ${currentMode} -> ${approvalMode}`);
+          // Instead of sending command, we rely on session restart if needed.
+          // But here, inside sendMessage, we might not want to restart. 
+          // If we reached here, it means session IS active.
+          // If user changed mode via dropdown, handleApprovalModeChange would have triggered restart.
+          // So this block might be redundant or just a fallback for "new session" case.
+          // For new session, start_session above uses backendConfig which we need to set correctly.
+          
+          // Wait, backendConfig above is constructed from state, NOT from approvalMode for yolo!
+          // We need to fix backendConfig construction in handleSendMessage too.
+          conversationModes.current[convId] = approvalMode;
+        }
+
         await api.send_message({
           sessionId: convId, // Tauri auto-converts to session_id
           message: messageText,
@@ -247,6 +343,7 @@ export const useMessageHandler = ({
     },
     [
       input,
+      approvalMode,
       isCliInstalled,
       activeConversation,
       conversations,
@@ -262,6 +359,7 @@ export const useMessageHandler = ({
       setupEventListenerForConversation,
       fetchProcessStatuses,
       generateTitleIfNeeded,
+      handleApprovalModeChange // Add dependency
     ]
   );
 
@@ -270,5 +368,7 @@ export const useMessageHandler = ({
     setInput,
     handleInputChange,
     handleSendMessage,
+    approvalMode,
+    setApprovalMode: handleApprovalModeChange,
   };
 };

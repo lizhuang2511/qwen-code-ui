@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { api } from "../lib/api";
-import { ArrowLeft, Plus, Trash2, Star, Tag as TagIcon, PanelLeft, Layers, X } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Star, Tag as TagIcon, PanelRight, Layers, X } from "lucide-react";
 import {
   Dialog,
   DialogTrigger,
@@ -166,73 +166,7 @@ export default function ProjectsPage() {
 
   return (
     <div className="flex w-full h-full overflow-hidden">
-      {/* Left Sidebar - Tags Panel */}
-      {showTagsPanel && (
-        <div className="w-64 flex flex-col border-r border-border bg-background transition-all duration-300">
-           {/* Header */}
-           <div className="flex items-center justify-between p-4 border-b border-border h-14">
-              <span className="font-semibold">{t("projects.categoryTags")}</span>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowTagsPanel(false)}>
-                 <X className="h-4 w-4" />
-              </Button>
-           </div>
-           
-           {/* Tags List */}
-           <ScrollArea className="flex-1">
-              <div className="p-2 space-y-1">
-                 {/* "All" Tag */}
-                 <div 
-                    className={cn("flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors text-sm", selectedTag === "All" ? "bg-accent text-accent-foreground" : "hover:bg-accent/50")}
-                    onClick={() => setSelectedTag("All")}
-                 >
-                    <Layers className="h-4 w-4" />
-                    <span>{t("projects.all")}</span>
-                 </div>
-                 
-                 {/* Dynamic Tags */}
-                 {tags.map(tag => (
-                    <ContextMenu key={tag}>
-                      <ContextMenuTrigger>
-                        <div 
-                          className={cn("flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors text-sm", selectedTag === tag ? "bg-accent text-accent-foreground" : "hover:bg-accent/50")}
-                          onClick={() => setSelectedTag(tag)}
-                        >
-                          <TagIcon className="h-4 w-4" />
-                          <span className="flex-1 truncate">{tag}</span>
-                        </div>
-                      </ContextMenuTrigger>
-                      <ContextMenuContent>
-                        <ContextMenuItem onClick={() => handleDeleteTag(tag)} className="text-red-500">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          {t("common.delete")}
-                        </ContextMenuItem>
-                      </ContextMenuContent>
-                    </ContextMenu>
-                 ))}
-              </div>
-           </ScrollArea>
-
-           {/* Add Tag Footer */}
-           <div className="p-2 border-t border-border">
-              <div className="flex gap-2">
-                 <Input 
-                   placeholder={t("projects.newTagName")} 
-                   value={newTag} 
-                   onChange={(e) => setNewTag(e.target.value)}
-                   onKeyDown={(e) => {
-                     if (e.key === 'Enter') handleAddTag();
-                   }}
-                   className="h-8 text-xs"
-                 />
-                 <Button onClick={handleAddTag} size="sm" className="h-8 w-8 p-0">
-                   <Plus className="h-4 w-4" />
-                 </Button>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* Right Content - Main Area */}
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         <div className="flex-none p-6 pb-0">
           <div className="mb-4 flex justify-between items-center">
@@ -262,7 +196,7 @@ export default function ProjectsPage() {
                  className="flex items-center gap-2"
                  onClick={() => setShowTagsPanel(!showTagsPanel)}
               >
-                 <PanelLeft className="h-4 w-4" />
+                 <PanelRight className="h-4 w-4" />
                  {t("projects.categoryTags")}
               </Button>
 
@@ -425,6 +359,72 @@ export default function ProjectsPage() {
           </div>
         </div>
       </div>
+
+      {/* Right Sidebar - Tags Panel */}
+      {showTagsPanel && (
+        <div className="w-64 flex flex-col border-l border-border bg-background transition-all duration-300">
+           {/* Header */}
+           <div className="flex items-center justify-between p-4 border-b border-border h-14">
+              <span className="font-semibold">{t("projects.categoryTags")}</span>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowTagsPanel(false)}>
+                 <X className="h-4 w-4" />
+              </Button>
+           </div>
+           
+           {/* Tags List */}
+           <ScrollArea className="flex-1">
+              <div className="p-2 space-y-1">
+                 {/* "All" Tag */}
+                 <div 
+                    className={cn("flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors text-sm", selectedTag === "All" ? "bg-accent text-accent-foreground" : "hover:bg-accent/50")}
+                    onClick={() => setSelectedTag("All")}
+                 >
+                    <Layers className="h-4 w-4" />
+                    <span>{t("projects.all")}</span>
+                 </div>
+                 
+                 {/* Dynamic Tags */}
+                 {tags.map(tag => (
+                    <ContextMenu key={tag}>
+                      <ContextMenuTrigger>
+                        <div 
+                          className={cn("flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors text-sm", selectedTag === tag ? "bg-accent text-accent-foreground" : "hover:bg-accent/50")}
+                          onClick={() => setSelectedTag(tag)}
+                        >
+                          <TagIcon className="h-4 w-4" />
+                          <span className="flex-1 truncate">{tag}</span>
+                        </div>
+                      </ContextMenuTrigger>
+                      <ContextMenuContent>
+                        <ContextMenuItem onClick={() => handleDeleteTag(tag)} className="text-red-500">
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          {t("common.delete")}
+                        </ContextMenuItem>
+                      </ContextMenuContent>
+                    </ContextMenu>
+                 ))}
+              </div>
+           </ScrollArea>
+
+           {/* Add Tag Footer */}
+           <div className="p-2 border-t border-border">
+              <div className="flex gap-2">
+                 <Input 
+                   placeholder={t("projects.newTagName")} 
+                   value={newTag} 
+                   onChange={(e) => setNewTag(e.target.value)}
+                   onKeyDown={(e) => {
+                     if (e.key === 'Enter') handleAddTag();
+                   }}
+                   className="h-8 text-xs"
+                 />
+                 <Button onClick={handleAddTag} size="sm" className="h-8 w-8 p-0">
+                   <Plus className="h-4 w-4" />
+                 </Button>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }

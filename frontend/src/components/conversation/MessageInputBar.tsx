@@ -9,6 +9,13 @@ import {
   DialogTrigger,
 } from "../ui/dialog";
 import { MentionInput, MentionInputRef } from "../common/MentionInput";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import { Send, Info, ImagePlus, Play, Loader2 } from "lucide-react";
 import { useBackend } from "../../contexts/BackendContext";
 import { getBackendText } from "../../utils/backendText";
@@ -34,6 +41,8 @@ interface MessageInputBarProps {
   isContinuingConversation: boolean;
   isNew?: boolean;
   isStreaming?: boolean;
+  approvalMode?: string;
+  setApprovalMode?: (mode: string) => void;
 }
 
 export interface MessageInputBarRef {
@@ -58,6 +67,8 @@ export const MessageInputBar = forwardRef<
       isContinuingConversation,
       isNew,
       isStreaming,
+      approvalMode,
+      setApprovalMode,
     },
     ref
   ) => {
@@ -137,6 +148,19 @@ export const MessageInputBar = forwardRef<
             className="flex gap-2 items-end mt-2"
             onSubmit={handleSendMessage}
           >
+            {approvalMode && setApprovalMode && (
+              <Select value={approvalMode} onValueChange={setApprovalMode}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="Mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Default</SelectItem>
+                  <SelectItem value="plan">Plan</SelectItem>
+                  <SelectItem value="yolo">Yolo</SelectItem>
+                  <SelectItem value="auto-edit">Auto-Edit</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
             <div className="flex-1 relative">
               <MentionInput
                 ref={mentionInputRef}

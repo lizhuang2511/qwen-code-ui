@@ -126,7 +126,7 @@ def run_test():
             "method": "session/prompt",
             "params": {
                 "sessionId": session_info["id"],
-                "prompt": [{"type": "text", "text": "/approval-mode"}]
+                "prompt": [{"type": "text", "text": "/approval-mode yolo"}]
             },
             "id": 3
         })

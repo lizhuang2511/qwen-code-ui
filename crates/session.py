@@ -383,6 +383,11 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
     # Resolve project ID
     project_id = projects.ensure_project(wd)
     
+    # Check if session exists and kill it if so
+    if session_id in _sessions:
+        print(f"[SESSION] Restarting session {session_id}")
+        kill_process(session_id)
+
     _emit_progress(session_id, "starting", "Starting session initialization", 5, wd if wd else None)
     
     # Initialize session state early with ready=False and empty queue
@@ -469,6 +474,11 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
                 env_vars["DASHSCOPE_API_KEY"] = api_key
                 # Also set OPENAI_API_KEY just in case
                 env_vars["OPENAI_API_KEY"] = api_key
+
+        # Inject QWEN_FORCE_YOLO if yolo_mode is enabled
+        if yolo_mode:
+            print(f"[SESSION] Yolo mode enabled. Injecting QWEN_FORCE_YOLO=1")
+            env_vars["QWEN_FORCE_YOLO"] = "1"
 
         proc = QwenProcess(exe, mdl_to_use, wd, env_vars=env_vars, yolo=yolo_mode)
         

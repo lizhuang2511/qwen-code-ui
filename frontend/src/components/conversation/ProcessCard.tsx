@@ -23,6 +23,7 @@ interface ProcessCardProps {
   processStatus: ProcessStatus | undefined;
   isActive: boolean;
   isSelected: boolean;
+  isWaitingForApproval?: boolean;
   onConversationSelect: (id: string) => void;
   onKillProcess: (id: string) => void;
   selectedConversationForEnd: { id: string; title: string } | null;
@@ -40,6 +41,7 @@ export function ProcessCard({
   processStatus,
   isActive,
   isSelected,
+  isWaitingForApproval = false,
   onConversationSelect,
   onKillProcess,
   selectedConversationForEnd,
@@ -77,6 +79,54 @@ export function ProcessCard({
   };
 
   const sessionColors = generateSessionColors(conversation.id);
+
+  const getStatusDisplay = () => {
+    if (!isActive) {
+      return {
+        colorClass: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+        dotClass: "bg-gray-400",
+        text: t("conversations.inactive")
+      };
+    }
+    
+    if (isWaitingForApproval) {
+      return {
+        colorClass: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200",
+        dotClass: "bg-yellow-500",
+        text: processStatus?.pid ? `${t("conversations.pidLabel", { pid: processStatus.pid })} • ${t("conversations.waitingForApproval")}` : t("conversations.waitingForApproval")
+      };
+    }
+    
+    const hasRunningTool = conversation.messages.some(msg => 
+      msg.parts.some(part => 
+        part.type === "toolCall" && 
+        part.toolCall.status === "running"
+      )
+    );
+
+    // Check if the last message is a completed tool call, implying we're waiting for model response
+    const lastMessage = conversation.messages[conversation.messages.length - 1];
+    const isToolProcessing = lastMessage?.parts.length > 0 && (() => {
+      const lastPart = lastMessage.parts[lastMessage.parts.length - 1];
+      return lastPart.type === "toolCall" && (lastPart.toolCall.status === "completed" || lastPart.toolCall.status === "failed");
+    })();
+
+    if (conversation.isStreaming || hasRunningTool || isToolProcessing) {
+      return {
+        colorClass: "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200",
+        dotClass: "bg-blue-500 animate-pulse",
+        text: processStatus?.pid ? `${t("conversations.pidLabel", { pid: processStatus.pid })} • ${t("conversations.replying")}` : t("conversations.replying")
+      };
+    }
+    
+    return {
+      colorClass: "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200",
+      dotClass: "bg-green-500",
+      text: processStatus?.pid ? `${t("conversations.pidLabel", { pid: processStatus.pid })} • ${t("conversations.replyCompleted")}` : t("conversations.replyCompleted")
+    };
+  };
+
+  const statusDisplay = getStatusDisplay();
 
   const renderKillButton = () => (
     <Dialog
@@ -244,15 +294,9 @@ export function ProcessCard({
               <div className="flex items-center gap-2 mt-2 justify-between">
                 <div className="flex items-center gap-1">
                   {isActive ? (
-                    <div className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs px-2 py-1 rounded-md flex items-center gap-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full" />
-                      <span>
-                        {processStatus?.pid
-                          ? t("conversations.pidLabel", {
-                              pid: processStatus.pid,
-                            })
-                          : t("conversations.active")}
-                      </span>
+                    <div className={`${statusDisplay.colorClass} text-xs px-2 py-1 rounded-md flex items-center gap-1`}>
+                      <div className={`w-2 h-2 rounded-full ${statusDisplay.dotClass}`} />
+                      <span>{statusDisplay.text}</span>
                       {isActive && (
                         <Dialog
                           open={
@@ -314,9 +358,9 @@ export function ProcessCard({
                       )}
                     </div>
                   ) : (
-                    <div className="bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 text-xs px-2 py-1 rounded-md flex items-center gap-1">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full" />
-                      <span>{t("conversations.inactive")}</span>
+                    <div className={`${statusDisplay.colorClass} text-xs px-2 py-1 rounded-md flex items-center gap-1`}>
+                      <div className={`w-2 h-2 rounded-full ${statusDisplay.dotClass}`} />
+                      <span>{statusDisplay.text}</span>
                       {!isActive && renderDeleteButton()}
                     </div>
                   )}

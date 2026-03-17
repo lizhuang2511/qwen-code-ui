@@ -180,7 +180,7 @@ function RootLayoutContent() {
     updateConversation
   );
 
-  const { input, handleInputChange, handleSendMessage } = useMessageHandler({
+  const { input, handleInputChange, handleSendMessage, approvalMode, setApprovalMode } = useMessageHandler({
     activeConversation,
     conversations: conversationsWithStatus,
     selectedModel,
@@ -610,6 +610,8 @@ function RootLayoutContent() {
                     isContinuingConversation={isContinuingConversation}
                     isNew={currentConversationWithStatus.isNew}
                     isStreaming={currentConversationWithStatus.isStreaming}
+                    approvalMode={approvalMode}
+                    setApprovalMode={setApprovalMode}
                   />
                 </>
               )}

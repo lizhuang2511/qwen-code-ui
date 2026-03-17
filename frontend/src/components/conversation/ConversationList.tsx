@@ -40,7 +40,7 @@ export function ConversationList({
     title: string;
   } | null>(null);
 
-  const { progress } = useConversation();
+  const { progress, confirmationRequests } = useConversation();
 
   // Search moved to global AppHeader trigger
 
@@ -154,6 +154,16 @@ export function ConversationList({
               const processStatus = getProcessStatus(conversation);
               const isActive = processStatus?.is_alive ?? false;
               const isSelected = activeConversation === conversation.id;
+              const isWaitingForApproval = 
+                Array.from(confirmationRequests.values()).some(
+                  (req) => req.sessionId === conversation.id
+                ) || 
+                conversation.messages.some(msg => 
+                  msg.parts.some(part => 
+                    part.type === "toolCall" && 
+                    part.toolCall.status === "pending"
+                  )
+                );
 
               return (
                 <ProcessCard
@@ -162,6 +172,7 @@ export function ConversationList({
                   processStatus={processStatus}
                   isActive={isActive}
                   isSelected={isSelected}
+                  isWaitingForApproval={isWaitingForApproval}
                   onConversationSelect={(id) => void onConversationSelect(id)}
                   onKillProcess={onKillProcess}
                   selectedConversationForEnd={selectedConversationForEnd}
