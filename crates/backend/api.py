@@ -22,6 +22,127 @@ except ImportError:
     HAS_WIN32 = False
 
 class Api:
+    def get_model_providers(self) -> Dict[str, Any]:
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        model_providers_file = os.path.join(base_dir, "model_providers.json")
+        if not os.path.exists(model_providers_file):
+            return {"providers": []}
+        try:
+            with open(model_providers_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Failed to read model providers: {e}")
+            return {"providers": [], "error": str(e)}
+
+    def get_env_config(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        key = params.get("key", "")
+        if not key:
+            return {"value": ""}
+            
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        env_file = os.path.join(base_dir, ".env")
+        
+        if not os.path.exists(env_file):
+            try:
+                with open(env_file, "w", encoding="utf-8") as f:
+                    pass
+                print(f"Created missing .env file at {env_file}")
+            except Exception as e:
+                print(f"Failed to create .env file: {e}")
+        
+        try:
+            import dotenv
+            env_dict = dotenv.dotenv_values(env_file)
+            value = env_dict.get(key)
+            if value is None:
+                value = os.environ.get(key, "")
+            return {"value": value}
+        except Exception as e:
+            print(f"Failed to get env config: {e}")
+            return {"value": ""}
+
+    def save_env_config(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        key = params.get("key", "")
+        value = params.get("value", "")
+        
+        if not key:
+            return {"ok": False, "error": "No key provided"}
+            
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        env_file = os.path.join(base_dir, ".env")
+        
+        try:
+            import dotenv
+            if not os.path.exists(env_file):
+                with open(env_file, "w", encoding="utf-8") as f:
+                    pass
+                    
+            success, k, v = dotenv.set_key(str(env_file), key, value)
+            if not success:
+                with open(env_file, "a", encoding="utf-8") as f:
+                    f.write(f"\n{key}='{value}'\n")
+                success = True
+                
+            dotenv.load_dotenv(env_file, override=True)
+            return {"ok": success}
+        except Exception as e:
+            print(f"Failed to save env config: {e}")
+            return {"ok": False, "error": str(e)}
+
+    def test_connection(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        base_url = params.get("base_url", "")
+        api_key = params.get("api_key", "")
+        model = params.get("model", "")
+        
+        if not base_url or not api_key:
+            return {"ok": False, "error": "Missing base_url or api_key"}
+            
+        import urllib.request
+        import urllib.error
+        
+        # Ensure base_url doesn't end with slash
+        base_url = base_url.rstrip("/")
+        url = f"{base_url}/chat/completions"
+        
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        
+        # Some providers strictly require stream parameter
+        data = json.dumps({
+            "model": model,
+            "messages": [{"role": "user", "content": "Hello"}],
+            "max_tokens": 5,
+            "stream": False
+        }).encode("utf-8")
+        
+        print(f"Testing connection to {url} with model {model}")
+        
+        try:
+            request = urllib.request.Request(url, data=data, headers=headers, method="POST")
+            with urllib.request.urlopen(request, timeout=15) as response:
+                response_body = response.read().decode("utf-8")
+                print(f"Connection test success: {response.status}")
+                response_data = json.loads(response_body)
+                return {"ok": True, "data": response_data}
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode("utf-8")
+            print(f"Test connection HTTPError: {e.code} - {error_body}")
+            # Try to parse error body as JSON to get more details
+            try:
+                error_json = json.loads(error_body)
+                if "error" in error_json:
+                    error_msg = error_json["error"].get("message", str(error_json["error"]))
+                    return {"ok": False, "error": f"HTTP {e.code}: {error_msg}"}
+            except:
+                pass
+            return {"ok": False, "error": f"HTTP {e.code}: {error_body[:200]}"}
+        except Exception as e:
+            print(f"Test connection error: {e}")
+            return {"ok": False, "error": str(e)}
+
     def check_cli_installed(self) -> bool:
         paths = [
             shutil.which("qwencodecli"),
@@ -141,10 +262,9 @@ class Api:
         return projects.list_enriched_projects()
 
     def get_project(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        pid = params.get("sha256", "")
         root = params.get("externalRootPath", "")
+        pid = projects.ensure_project(root)
         name = os.path.basename(root) if root else "Project"
-        projects.upsert_project(pid, root, name)
         return {
             "sha256": pid,
             "root_path": root,
@@ -460,6 +580,280 @@ class Api:
             json.dump(current_config, f, indent=2, ensure_ascii=False)
             
         return True
+
+    def get_qwen_settings(self) -> Dict[str, Any]:
+        """
+        Reads the qwen cli settings file from ~/.qwen/settings.json
+        """
+        path = os.path.expanduser("~/.qwen/settings.json")
+        if not os.path.exists(path):
+            return {}
+        
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Failed to read qwen settings: {e}")
+            return {}
+            
+    def get_ui_settings(self) -> Dict[str, Any]:
+        """
+        Reads the UI settings file from ui_settings.json in the project root directory
+        """
+        # Get the root directory of the project (2 levels up from crates/backend/api.py)
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        path = os.path.join(base_dir, "ui_settings.json")
+        if not os.path.exists(path):
+            return {}
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Failed to read ui settings: {e}")
+            return {}
+
+    def save_ui_settings(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Saves UI settings to ui_settings.json in the project root directory
+        """
+        # Get the root directory of the project
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        path = os.path.join(base_dir, "ui_settings.json")
+        
+        try:
+            current_settings = {}
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if content.strip():
+                        current_settings = json.loads(content)
+                        
+            current_settings.update(params)
+            
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(current_settings, f, indent=2, ensure_ascii=False)
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def open_qwen_settings_in_editor(self) -> Dict[str, Any]:
+        """
+        Opens ~/.qwen/settings.json in the default text editor (notepad on Windows).
+        """
+        path = os.path.expanduser("~/.qwen/settings.json")
+        try:
+            if not os.path.exists(path):
+                # Create default empty file if it doesn't exist so notepad can open it
+                directory = os.path.dirname(path)
+                if not os.path.exists(directory):
+                    os.makedirs(directory)
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write("{}")
+            
+            if sys.platform == 'win32':
+                subprocess.Popen(['notepad.exe', path])
+            elif sys.platform == 'darwin':
+                subprocess.Popen(['open', '-e', path])
+            else:
+                subprocess.Popen(['xdg-open', path])
+            return {"ok": True}
+        except Exception as e:
+            print(f"Failed to open settings file: {e}")
+            return {"ok": False, "error": str(e)}
+
+    def open_qwen_folder(self) -> Dict[str, Any]:
+        """
+        Opens the ~/.qwen directory in the system's file manager.
+        """
+        path = os.path.expanduser("~/.qwen")
+        try:
+            if not os.path.exists(path):
+                os.makedirs(path)
+                
+            if sys.platform == 'win32':
+                os.startfile(path)
+            elif sys.platform == 'darwin':
+                subprocess.Popen(['open', path])
+            else:
+                subprocess.Popen(['xdg-open', path])
+            return {"ok": True}
+        except Exception as e:
+            print(f"Failed to open qwen folder: {e}")
+            return {"ok": False, "error": str(e)}
+
+    def open_model_providers_json(self) -> Dict[str, Any]:
+        """
+        Opens the model_providers.json file in the default text editor.
+        """
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        path = os.path.join(base_dir, "model_providers.json")
+        try:
+            if not os.path.exists(path):
+                return {"ok": False, "error": "model_providers.json not found"}
+                
+            if sys.platform == 'win32':
+                subprocess.Popen(['notepad.exe', path])
+            elif sys.platform == 'darwin':
+                subprocess.Popen(['open', '-e', path])
+            else:
+                subprocess.Popen(['xdg-open', path])
+            return {"ok": True}
+        except Exception as e:
+            print(f"Failed to open model_providers.json: {e}")
+            return {"ok": False, "error": str(e)}
+
+    def update_qwen_settings(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Updates the ~/.qwen/settings.json file with new configuration.
+        Expected params:
+        - provider_id: string (e.g., "qwen-max", "Qwen/Qwen2.5-7B-Instruct")
+        - provider_name: string (optional)
+        - base_url: string
+        - api_key: string
+        - env_key: string (optional, defaults to "DASHSCOPE_API_KEY" or similar)
+        """
+        path = os.path.expanduser("~/.qwen/settings.json")
+        directory = os.path.dirname(path)
+        
+        if not os.path.exists(directory):
+            try:
+                os.makedirs(directory)
+            except Exception as e:
+                return {"ok": False, "error": f"Failed to create config directory: {e}"}
+        
+        # Read existing or create default
+        settings = {}
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if content.strip():
+                        settings = json.loads(content)
+            except Exception as e:
+                print(f"Warning: Failed to read existing settings, overwriting. Error: {e}")
+        
+        # Ensure structure
+        if "env" not in settings:
+            settings["env"] = {}
+        if "modelProviders" not in settings:
+            settings["modelProviders"] = {}
+        if "openai" not in settings["modelProviders"]:
+            settings["modelProviders"]["openai"] = []
+        if "model" not in settings:
+            settings["model"] = {}
+            
+        provider_id = params.get("provider_id", "")
+        base_url = params.get("base_url", "")
+        api_key = params.get("api_key", "")
+        # env_key is the key NAME used in "env" section, not the value
+        # If not provided, we can generate one or reuse existing if found
+        env_key = params.get("env_key", "")
+        use_oauth = params.get("use_oauth", False)
+        enable_thinking = params.get("enable_thinking", False)
+        
+        if not use_oauth and (not provider_id or not base_url or not api_key):
+            return {"ok": False, "error": "Missing required fields (provider_id, base_url, api_key)"}
+
+        # Handle OAuth mode
+        if use_oauth:
+            if "security" not in settings:
+                settings["security"] = {}
+            if "auth" not in settings["security"]:
+                settings["security"]["auth"] = {}
+            settings["security"]["auth"]["selectedType"] = "qwen-oauth"
+            
+            if "model" not in settings:
+                settings["model"] = {}
+            settings["model"]["name"] = "coder-model"
+            
+            # Ensure version
+            settings["$version"] = 3
+            
+            # Write back
+            try:
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(settings, f, indent=2, ensure_ascii=False)
+                return {"ok": True}
+            except Exception as e:
+                return {"ok": False, "error": str(e)}
+
+        # Generate unique env_key if not provided or default
+        if not env_key or env_key == "CUSTOM_API_KEY":
+             import re
+             # Create a safe key based on provider_id to avoid collisions
+             safe_id = re.sub(r'[^a-zA-Z0-9_]', '_', provider_id).upper()
+             env_key = f"API_KEY_{safe_id}"
+
+        # 1. Update env section
+        settings["env"][env_key] = api_key
+        
+        # 2. Update modelProviders
+        openai_providers = settings["modelProviders"]["openai"]
+        
+        def norm_url(u):
+            return u.rstrip("/") if u else ""
+            
+        target_url = norm_url(base_url)
+        
+        # Clean up duplicates with the same id OR same base_url (to ensure one config per provider endpoint)
+        new_providers = []
+        for p in openai_providers:
+            p_id = p.get("id")
+            p_url = norm_url(p.get("baseUrl", ""))
+            
+            # Keep if it's not the same ID AND not the same URL
+            # This ensures we don't have multiple entries for the same provider URL (cleaning up previous configs for that provider)
+            if p_id != provider_id and p_url != target_url:
+                new_providers.append(p)
+        
+        new_provider_config = {
+            "id": provider_id,
+            "name": params.get("provider_name", provider_id),
+            "baseUrl": base_url,
+            "envKey": env_key,
+            "generationConfig": {
+                "maxRetries": 3,
+                "timeout": 60000,
+                "samplingParams": {
+                    "temperature": 0.5,
+                    "max_tokens": 4096,
+                    "top_p": 0.95
+                }
+            }
+        }
+
+        if enable_thinking:
+            new_provider_config["generationConfig"]["extra_body"] = {
+                "enable_thinking": True
+            }
+            # Increase timeout for thinking models as they take longer
+            new_provider_config["generationConfig"]["timeout"] = 300000
+        
+        new_providers.append(new_provider_config)
+        settings["modelProviders"]["openai"] = new_providers
+            
+        # 3. Set current model
+        settings["model"]["name"] = provider_id
+        
+        # 4. Set security auth type and version
+        if "security" not in settings:
+            settings["security"] = {}
+        if "auth" not in settings["security"]:
+            settings["security"]["auth"] = {}
+            
+        # Always use openai for custom providers (as per docs for OpenAI-compatible)
+        settings["security"]["auth"]["selectedType"] = "openai"
+        
+        # Ensure $version exists based on standard qwen settings format
+        settings["$version"] = 3
+
+        # Write back
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(settings, f, indent=2, ensure_ascii=False)
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     def check_mcp_server(self, params: Dict[str, Any]) -> Dict[str, Any]:
         config = params.get("config", {})

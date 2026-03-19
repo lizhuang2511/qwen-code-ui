@@ -67,6 +67,7 @@ export function FileContentViewer({
 
   const [imageRotation, setImageRotation] = useState(0);
   const [pdfScale, setPdfScale] = useState(1.0);
+  const [textScale, setTextScale] = useState(1.0);
   const [imageData, setImageData] = useState<string | null>(null);
   const [imageInfo, setImageInfo] = useState<{
     width: number;
@@ -404,6 +405,19 @@ export function FileContentViewer({
     setPdfScale(1.0);
   };
 
+  // Text/Markdown viewer control handlers
+  const handleTextZoomIn = () => {
+    setTextScale((prev) => Math.min(3.0, prev + 0.1));
+  };
+
+  const handleTextZoomOut = () => {
+    setTextScale((prev) => Math.max(0.5, prev - 0.1));
+  };
+
+  const handleTextResetZoom = () => {
+    setTextScale(1.0);
+  };
+
   // Get appropriate icon for file type
   const getFileIcon = (path: string) => {
     const fileType = getFileType(path);
@@ -416,6 +430,37 @@ export function FileContentViewer({
         return <FileText className="h-5 w-5 text-blue-500 flex-shrink-0" />;
     }
   };
+
+  // Handle Ctrl+Wheel for zooming
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      if ((e.ctrlKey || e.metaKey) && isOpen) {
+        // Only zoom if the mouse is over the dialog content
+        if (dialogContentRef.current && dialogContentRef.current.contains(e.target as Node)) {
+          e.preventDefault();
+          
+          if (!filePath) return;
+          const fileType = getFileType(filePath);
+          
+          if (e.deltaY < 0) {
+            // Zoom in
+            if (fileType === "image") handleImageZoomIn();
+            else if (fileType === "pdf") handlePdfZoomIn();
+            else handleTextZoomIn();
+          } else {
+            // Zoom out
+            if (fileType === "image") handleImageZoomOut();
+            else if (fileType === "pdf") handlePdfZoomOut();
+            else handleTextZoomOut();
+          }
+        }
+      }
+    };
+
+    // Use non-passive listener to be able to prevent default browser zoom
+    document.addEventListener("wheel", handleWheel, { passive: false });
+    return () => document.removeEventListener("wheel", handleWheel);
+  }, [isOpen, filePath, getFileType]);
 
   if (!isOpen) return null;
 
@@ -575,6 +620,36 @@ export function FileContentViewer({
                     (fileContent.is_binary && forceViewAsText)) &&
                   fileContent.content !== null && (
                     <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleTextZoomOut}
+                        disabled={textScale <= 0.5}
+                        className="h-7 w-7 p-0"
+                        title="Zoom Out"
+                      >
+                        <ZoomOut className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleTextResetZoom}
+                        className="text-xs h-7 px-2 min-w-[3rem]"
+                        title="Reset Zoom"
+                      >
+                        {Math.round(textScale * 100)}%
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleTextZoomIn}
+                        disabled={textScale >= 3.0}
+                        className="h-7 w-7 p-0"
+                        title="Zoom In"
+                      >
+                        <ZoomIn className="h-3.5 w-3.5" />
+                      </Button>
+                      <div className="w-px h-4 bg-border mx-1" />
                       {!isEditing ? (
                         <>
                           <Button
@@ -753,7 +828,7 @@ export function FileContentViewer({
                         <div 
                           className="flex-1 overflow-y-auto p-4 bg-background"
                         >
-                          <MarkdownRenderer>{fileContent.content}</MarkdownRenderer>
+                          <MarkdownRenderer fontSize={Math.round(14 * textScale)}>{fileContent.content}</MarkdownRenderer>
                         </div>
                       );
                     }
@@ -765,6 +840,7 @@ export function FileContentViewer({
                           language={getLanguageFromExtension(fileContent.path)}
                           readOnly={!isEditing}
                           onChange={isEditing ? setEditedContent : undefined}
+                          fontSize={Math.round(14 * textScale)}
                         />
                       </div>
                     );

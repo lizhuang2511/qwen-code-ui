@@ -239,4 +239,4 @@ if __name__ == "__main__":
     def ticker_wrapper():
         start_ticker(stop_event, window, icon_path)
         
-    webview.start(ticker_wrapper, debug=False, icon=icon_path)
+    webview.start(ticker_wrapper, debug=False, icon=icon_path, private_mode=False)

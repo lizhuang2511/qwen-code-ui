@@ -1,8 +1,7 @@
 import markdown
-import html
 from pymdownx import superfences, magiclink, caret, betterem, mark, tasklist, tilde, inlinehilite, critic, highlight,\
     _bypassnorm
-#import mdx_math
+import mdx_math
 
 extensions = [
     'markdown.extensions.extra',
@@ -1113,99 +1112,24 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding: 0 5px
 '''
 myhtml = '''
 <!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, minimal-ui">
-    <title>Preview</title>
-    <style>
-        {}
-        /* New CSS for toggle and editor */
-        html, body {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-        }
-        .preview-mode-toggle {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-            padding: 8px 16px;
-            background-color: #0366d6;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif;
-            font-size: 14px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-        .preview-mode-toggle:hover {
-            background-color: #0255b3;
-        }
-        #preview-container {
-            height: 100%;
-            overflow-y: auto;
-            box-sizing: border-box;
-            -webkit-overflow-scrolling: touch;
-        }
-        #raw-content-area {
-            display: none;
-            width: 100%;
-            height: 100%;
-            padding: 20px;
-            box-sizing: border-box;
-            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-            font-size: 14px;
-            border: none;
-            resize: none;
-            background-color: #f6f8fa;
-            color: #24292e;
-            outline: none;
-            overflow-y: auto;
-        }
-        .markdown-body {
-            padding: 20px;
-            max-width: 900px;
-            margin: 0 auto;
-        }
-    </style>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css" crossorigin="anonymous">
-    <script src="https://unpkg.com/mermaid@8.7.0/dist/mermaid.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/katex/dist/contrib/mathtex-script-type.min.js" defer></script>
-</head>
-<body>
-    <button id="toggle-btn" class="preview-mode-toggle" onclick="toggleMode()">编辑模式</button>
-    
-    <div id="preview-container">
-        <article class="markdown-body">
-            {}
-        </article>
-    </div>
-    <textarea id="raw-content-area" spellcheck="false">{}</textarea>
-
-    <script>
-        function toggleMode() {
-            const preview = document.getElementById('preview-container');
-            const editor = document.getElementById('raw-content-area');
-            const btn = document.getElementById('toggle-btn');
-            
-            if (editor.style.display === 'none') {
-                editor.style.display = 'block';
-                preview.style.display = 'none';
-                btn.textContent = '阅读模式';
-            } else {
-                editor.style.display = 'none';
-                preview.style.display = 'block';
-                btn.textContent = '编辑模式';
-            }
-        }
-    </script>
-</body>
-</html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1, minimal-ui">
+            <title>Title</title>
+            <style type="text/css">
+                {}
+            </style>
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css" crossorigin="anonymous">
+            <script src="https://unpkg.com/mermaid@8.7.0/dist/mermaid.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.js" crossorigin="anonymous"></script>
+            <script src="https://cdn.jsdelivr.net/npm/katex/dist/contrib/mathtex-script-type.min.js" defer></script>
+        </head>
+        <body>
+            <article class="markdown-body">
+                {}
+            </article>
+        </body>
+    </html>
 '''
 extension_configs = {
     'mdx_math': {
@@ -1275,12 +1199,10 @@ def remove_blank_lines_before_table(text):
     text = re.sub(r'(\n\s*)+<table>', '<table>', text, flags=re.MULTILINE)
     return text
 def md2html0(text):
-    raw_text = text
     text= fix_table_tag_spacing(text)
     text = remove_blank_lines_before_table(text)
-    html_content = markdown.markdown(text, extensions=extensions, extension_configs=extension_configs)
-    raw_escaped = html.escape(raw_text)
-    return myhtml.format(Mycss, html_content, raw_escaped)
+    html = markdown.markdown(text, extensions=extensions, extension_configs=extension_configs)
+    return myhtml.format(Mycss, html)
 
 
 import os
@@ -1305,7 +1227,8 @@ def md_to_html_path(md_path: str) -> str:
 
     # 转换为字符串（自动处理不同操作系统的路径分隔符）
     return str(html_path)
-
+import os
+from pathlib import Path
 def md2html(text, in_file=r'D:\shujuku\ceshishuju2\pilao\pilao.md', encoding='utf-8'):
     """
     将 Markdown 转换为 HTML 并可选择保存到文件
@@ -1316,28 +1239,11 @@ def md2html(text, in_file=r'D:\shujuku\ceshishuju2\pilao\pilao.md', encoding='ut
     """
     # 处理文本
     output_file=md_to_html_path(in_file)
-    
-    # 保存原始文本用于编辑器
-    raw_text = text
-    
     text = fix_table_tag_spacing(text)
     text = remove_blank_lines_before_table(text)
-    
-    # 如果不是md文件，尝试作为代码块包裹
-    if in_file:
-        ext = os.path.splitext(in_file)[1].lower()
-        if ext and ext != '.md':
-            # 去掉点
-            lang = ext.lstrip('.')
-            text = f"```{lang}\n{text}\n```"
-
     # 转换 Markdown
-    html_content = markdown.markdown(text, extensions=extensions, extension_configs=extension_configs)
-    
-    # 转义原始文本
-    raw_escaped = html.escape(raw_text)
-    
-    final_html = myhtml.format(Mycss, html_content, raw_escaped)
+    html = markdown.markdown(text, extensions=extensions, extension_configs=extension_configs)
+    final_html = myhtml.format(Mycss, html)
     # 保存到文件（如果指定了输出文件）
     if output_file is not None:
         output_path = Path(output_file)

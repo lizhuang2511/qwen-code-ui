@@ -153,6 +153,7 @@
     "selectBackend": "選擇後端",
     "language": "語言",
     "selectLanguage": "選擇語言",
+    "replyFontSize": "回覆文本字體大小 (px)",
     "model": "模型",
     "selectModel": "選擇模型",
     "authMethod": "驗證方式",

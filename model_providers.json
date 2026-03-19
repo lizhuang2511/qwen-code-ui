@@ -1,0 +1,44 @@
+{
+  "providers": [
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "url": "https://openrouter.ai/api/v1",
+      "env_key": "OPENROUTER_API_KEY",
+      "models": [
+        "anthropic/claude-3.5-sonnet",
+        "google/gemini-pro-1.5",
+        "meta-llama/llama-3.1-70b-instruct",
+        "mistralai/mistral-large"
+      ]
+    },
+    {
+      "id": "siliconflow",
+      "name": "SiliconFlow (硅基流动)",
+      "url": "https://api.siliconflow.cn/v1",
+      "env_key": "SILICONFLOW_API_KEY",
+      "models": [
+        "Qwen/Qwen2.5-7B-Instruct",
+        "Qwen/Qwen2.5-72B-Instruct",
+        "deepseek-ai/DeepSeek-V2.5",
+        "Pro/MiniMaxAI/MiniMax-M2.5",
+        "Pro/zai-org/GLM-5",
+        "Pro/moonshotai/Kimi-K2.5",
+        "Pro/zai-org/GLM-4.7"
+      ]
+    },
+    {
+      "id": "qwen",
+      "name": "Qwen (DashScope)",
+      "url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "env_key": "DASHSCOPE_API_KEY",
+      "models": [
+        "qwen-max",
+        "qwen-plus",
+        "qwen-turbo",
+        "qwen-coder-plus",
+        "qwen-coder-turbo"
+      ]
+    }
+  ]
+}

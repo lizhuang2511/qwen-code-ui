@@ -1,8 +1,10 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { FolderTree, Settings as SettingsIcon, History, MessageSquarePlus, Play } from "lucide-react";
 import { SmartLogo } from "../branding/SmartLogo";
 import { DesktopText } from "../branding/DesktopText";
+import { ModelContextProtocol } from "../common/ModelContextProtocol";
 import { SidebarTrigger } from "../ui/sidebar";
 import { Button } from "../ui/button";
 import { api } from "../../lib/api";
@@ -33,6 +35,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   currentProjectPath,
 }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
 
   const shouldShowDirectoryButton =
     showDirectoryButton !== undefined
@@ -136,6 +139,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 <SettingsIcon className="h-4 w-4" />
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/mcp")}
+              title={t("dashboard.mcpCard.title", "MCP Settings")}
+            >
+              <ModelContextProtocol className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </div>

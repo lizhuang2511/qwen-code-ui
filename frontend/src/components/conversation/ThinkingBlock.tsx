@@ -3,6 +3,7 @@ import { ChevronRight, Brain } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useSettings } from "@/contexts/SettingsContext";
 import {
   Collapsible,
   CollapsibleContent,
@@ -16,6 +17,7 @@ interface ThinkingBlockProps {
 export function ThinkingBlock({ thinking }: ThinkingBlockProps) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
+  const { replyFontSize } = useSettings();
 
   // Type guard: ensure thinking is a string
   if (
@@ -40,7 +42,10 @@ export function ThinkingBlock({ thinking }: ThinkingBlockProps) {
         <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform group-data-[state=open]/collapsible:rotate-90 " />
       </CollapsibleTrigger>
       <CollapsibleContent className="p-3 border-t border-border">
-        <div className="prose prose-neutral prose-sm max-w-none dark:prose-invert text-xs text-muted-foreground">
+        <div 
+          className="prose prose-neutral prose-sm max-w-none dark:prose-invert text-muted-foreground"
+          style={{ fontSize: `${Math.max(10, replyFontSize - 2)}px` }}
+        >
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{thinking}</ReactMarkdown>
         </div>
       </CollapsibleContent>

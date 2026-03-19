@@ -17,6 +17,7 @@ interface CodeMirrorViewerProps {
   language: string;
   readOnly?: boolean;
   onChange?: (value: string) => void;
+  fontSize?: number;
 }
 
 // Language extension mapping
@@ -58,6 +59,7 @@ export function CodeMirrorViewer({
   language,
   readOnly = true,
   onChange,
+  fontSize = 14,
 }: CodeMirrorViewerProps) {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -116,7 +118,7 @@ export function CodeMirrorViewer({
           searchKeymap: false,
         }}
         style={{
-          fontSize: "14px",
+          fontSize: `${fontSize}px`,
           fontFamily:
             'ui-monospace, SFMono-Regular, "SF Mono", Monaco, Menlo, "Liberation Mono", "Consolas", monospace',
         }}

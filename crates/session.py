@@ -459,21 +459,26 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
         env_vars = {}
 
         if use_oauth:
-            # OAuth Mode: Enforce qwenfree if credentials exist or we expect them
-            # Note: If credentials don't exist, CLI might prompt or fail, but we follow user instruction to use OAuth mode for qwenfree.
+            # OAuth Mode: Use configured model
             if QwenProcess.check_credentials():
-                 print(f"[SESSION] OAuth mode enabled and credentials found. Enforcing model: qwenfree")
-                 mdl_to_use = "qwenfree"
+                 print(f"[SESSION] OAuth mode enabled and credentials found. Using model: {mdl}")
+                 mdl_to_use = mdl
             else:
                  print(f"[SESSION] OAuth mode enabled but no credentials found. Keeping model {mdl} (CLI may prompt)")
         else:
-            # OpenAI Mode: Use provided model and inject API Key
-            print(f"[SESSION] OpenAI mode enabled. Using model: {mdl}")
+            # Custom Model Mode: Use provided model and inject API Key and Base URL
+            print(f"[SESSION] Custom API mode enabled. Using model: {mdl}")
             if api_key:
-                print(f"[SESSION] Injecting DASHSCOPE_API_KEY from config")
+                print(f"[SESSION] Injecting API Keys from config")
                 env_vars["DASHSCOPE_API_KEY"] = api_key
-                # Also set OPENAI_API_KEY just in case
                 env_vars["OPENAI_API_KEY"] = api_key
+            
+            if backend_config and backend_config.get("base_url"):
+                custom_url = backend_config.get("base_url")
+                print(f"[SESSION] Injecting Custom Base URL: {custom_url}")
+                env_vars["OPENAI_BASE_URL"] = custom_url
+                # Some Qwen CLI versions might use a different env var for custom endpoints
+                env_vars["QWEN_BASE_URL"] = custom_url
 
         # Inject QWEN_FORCE_YOLO if yolo_mode is enabled
         if yolo_mode:

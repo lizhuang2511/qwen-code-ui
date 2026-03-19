@@ -21,6 +21,7 @@ export const defaultQwenConfig: QwenConfig = {
   baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
   model: "qwen-max",
   useOAuth: true,
+  enableThinking: false,
 };
 
 export const defaultLLxprtConfig: LLxprtConfig = {

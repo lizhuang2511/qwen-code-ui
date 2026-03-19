@@ -149,7 +149,23 @@ export function ConversationList({
           </div>
         ) : (
           conversations
-            .sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime())
+            .sort((a, b) => {
+              const getSortTime = (c: Conversation) => {
+                if (c.metadata?.timestamp) {
+                  const ts = parseInt(c.metadata.timestamp);
+                  if (!isNaN(ts)) return ts;
+                }
+                if (c.messages && c.messages.length > 0) {
+                  return c.messages[0].timestamp.getTime();
+                }
+                const idTs = parseInt(c.id);
+                if (!isNaN(idTs) && idTs > 1000000000000) {
+                  return idTs;
+                }
+                return c.lastUpdated.getTime();
+              };
+              return getSortTime(b) - getSortTime(a);
+            })
             .map((conversation) => {
               const processStatus = getProcessStatus(conversation);
               const isActive = processStatus?.is_alive ?? false;

@@ -131,7 +131,7 @@ ${part.thinking}`;
                               <ThinkingBlock thinking={msgPart.thinking} />
                             ) : msgPart.type === "text" ? (
                               <div className="text-sm text-gray-900 dark:text-gray-100 mb-2">
-                                <MessageContent content={msgPart.text} />
+                                <MessageContent content={msgPart.text} isAssistant={true} />
                               </div>
                             ) : msgPart.type === "toolCall" ? (
                               <>

@@ -27,6 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
+import { useSettings } from "@/contexts/SettingsContext";
 
 // Helper function to determine if a URL is external
 function isExternalUrl(href: string): boolean {
@@ -46,9 +47,16 @@ async function handleLinkClick(href: string, event: React.MouseEvent) {
   }
 }
 
-export function MarkdownRenderer({ children }: { children: string }) {
+export function MarkdownRenderer({ children, isAssistant = false, fontSize }: { children: string, isAssistant?: boolean, fontSize?: number }) {
+  const { replyFontSize } = useSettings();
+
+  const finalFontSize = fontSize || (isAssistant ? replyFontSize : undefined);
+
   return (
-    <div className="prose prose-neutral prose-sm max-w-none dark:prose-invert text-sm break-words overflow-wrap-anywhere">
+    <div 
+      className="prose prose-neutral prose-sm max-w-none dark:prose-invert break-words overflow-wrap-anywhere"
+      style={finalFontSize ? { fontSize: `${finalFontSize}px` } : undefined}
+    >
       <ReactMarkdown
         components={{
           code: ({ children, className }) => {

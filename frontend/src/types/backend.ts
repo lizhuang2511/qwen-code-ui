@@ -26,6 +26,7 @@ export interface QwenConfig {
   model: string;
   useOAuth: boolean;
   yolo?: boolean;
+  enableThinking?: boolean;
 }
 
 // Provider names as union type for type safety
@@ -38,7 +39,8 @@ export type LLxprtProvider =
   | "groq"
   | "together"
   | "xai"
-  | "custom";
+  | "custom"
+  | (string & {});
 
 export interface LLxprtConfig {
   type: "llxprt";

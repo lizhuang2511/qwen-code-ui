@@ -31,7 +31,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, RefreshCw, ChevronsUpDown, Check } from "lucide-react";
+import { AlertTriangle, RefreshCw, ChevronsUpDown, Check, Eye, EyeOff } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -39,7 +39,43 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useBackend, useBackendConfig } from "@/contexts/BackendContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { GeminiAuthMethod, LLxprtProvider } from "@/types/backend";
+
+interface ModelProvider {
+  id: string;
+  name: string;
+  url: string;
+  env_key?: string;
+  models: string[];
+}
+
+// Add global type definition for pywebview
+declare global {
+  interface Window {
+    pywebview?: {
+      api: {
+        get_model_providers: () => Promise<{ providers: ModelProvider[] }>;
+        get_qwen_settings: () => Promise<any>;
+        update_qwen_settings: (params: {
+          provider_id: string;
+          provider_name?: string;
+          base_url: string;
+          api_key: string;
+          env_key?: string;
+          use_oauth?: boolean;
+          enable_thinking?: boolean;
+        }) => Promise<{ ok: boolean; error?: string }>;
+        open_qwen_settings_in_editor: () => Promise<{ ok: boolean; error?: string }>;
+        open_qwen_folder: () => Promise<{ ok: boolean; error?: string }>;
+        open_model_providers_json: () => Promise<{ ok: boolean; error?: string }>;
+        test_connection: (params: { base_url: string; api_key: string; model: string }) => Promise<{ ok: boolean; data?: any; error?: string }>;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        [key: string]: any;
+      };
+    };
+  }
+}
 
 interface OpenRouterModel {
   id: string;
@@ -59,6 +95,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   onModelChange,
 }) => {
   const { t, i18n } = useTranslation();
+  const { replyFontSize, setReplyFontSize } = useSettings();
   const { selectedBackend, switchBackend } = useBackend();
   const { config: qwenConfig, updateConfig: updateQwenConfig } =
     useBackendConfig("qwen");
@@ -67,6 +104,183 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const { config: llxprtConfig, updateConfig: updateLLxprtConfig } =
     useBackendConfig("llxprt");
 
+  const [jsonProviders, setJsonProviders] = useState<ModelProvider[]>([]);
+  const [showQwenApiKey, setShowQwenApiKey] = useState(false);
+  const [showLlxprtApiKey, setShowLlxprtApiKey] = useState(false);
+  
+  // Store full settings file content to look up keys when switching providers
+  const [qwenSettingsFile, setQwenSettingsFile] = useState<any>(null);
+
+  useEffect(() => {
+    if (open) {
+      const fetchData = async () => {
+        // 1. Fetch Providers
+        try {
+          if (window.pywebview?.api?.get_model_providers) {
+            console.log("Fetching model providers via pywebview API");
+            const data = await window.pywebview.api.get_model_providers();
+            if (data.providers) {
+              setJsonProviders(data.providers);
+            }
+          } else {
+             // Fallback fetch
+             const baseUrl = "http://127.0.0.1:1858";
+             const res = await fetch(`${baseUrl}/api/model-providers`);
+             const data = await res.json();
+             if (data.providers) setJsonProviders(data.providers);
+          }
+        } catch (e) {
+          console.error("Failed to load model providers", e);
+        }
+
+        // 2. Fetch Qwen Settings
+        try {
+          if (window.pywebview?.api?.get_qwen_settings) {
+            const settings = await window.pywebview.api.get_qwen_settings();
+            console.log("Loaded Qwen Settings:", settings);
+            setQwenSettingsFile(settings);
+            
+            // Sync current config with settings file if applicable
+            if (settings && settings.security?.auth?.selectedType) {
+              const authType = settings.security.auth.selectedType;
+              const isOAuth = authType === "qwen-oauth";
+              
+              if (isOAuth) {
+                updateQwenConfig({
+                  useOAuth: true,
+                  model: "coder-model"
+                });
+              } else if (settings.model && settings.model.name) {
+                const providers = settings.modelProviders?.openai || [];
+                const activeProviderId = settings.model.name;
+                const activeProviderConfig = providers.find((p: any) => p.id === activeProviderId);
+                
+                if (activeProviderConfig) {
+                  const envKey = activeProviderConfig.envKey;
+                  const apiKey = settings.env?.[envKey] || "";
+                  const isThinking = activeProviderConfig.generationConfig?.extra_body?.enable_thinking === true;
+                  
+                  updateQwenConfig({
+                    baseUrl: activeProviderConfig.baseUrl,
+                    apiKey: apiKey,
+                    model: activeProviderId,
+                    useOAuth: false,
+                    enableThinking: isThinking
+                  });
+                } else {
+                  // Fallback if we have a model name but no specific provider match
+                  updateQwenConfig({
+                    model: activeProviderId,
+                    useOAuth: false
+                  });
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Failed to load qwen settings", e);
+        }
+      };
+      
+      fetchData();
+    }
+  }, [open]);
+
+  const saveSettingsToQwenConfig = async () => {
+    // Determine current provider info
+    // If custom, we use "custom" as ID?
+    // We need to find the provider ID corresponding to current URL
+    const currentProvider = jsonProviders.find(p => p.url === qwenConfig.baseUrl);
+    const providerName = currentProvider ? currentProvider.name : "Custom";
+    // Let backend generate the envKey to ensure uniqueness
+    const envKey = currentProvider && currentProvider.env_key ? currentProvider.env_key : undefined;
+    
+    // Use the specific model selected if possible, or the provider ID if it's a "presets" style
+    // The provider_id passed to backend should be `qwenConfig.model`.
+    
+    const targetModelId = qwenConfig.useOAuth ? "coder-model" : (qwenConfig.model || "custom-model");
+    
+    try {
+      if (window.pywebview?.api?.update_qwen_settings) {
+        const res = await window.pywebview.api.update_qwen_settings({
+          provider_id: targetModelId,
+          provider_name: providerName, 
+          base_url: qwenConfig.baseUrl,
+          api_key: qwenConfig.apiKey,
+          env_key: envKey, // Undefined if custom, triggering backend auto-generation
+          use_oauth: qwenConfig.useOAuth,
+          enable_thinking: qwenConfig.enableThinking
+        });
+        
+        if (res.ok) {
+          toast.success(`Settings saved to ~/.qwen/settings.json`);
+        } else {
+          toast.error(`Failed to save: ${res.error || "Unknown error"}`);
+        }
+      } else {
+        toast.error("Native settings API not available");
+      }
+    } catch (e) {
+      console.error("Failed to save settings", e);
+      toast.error("Failed to save settings");
+    }
+  };
+
+
+  const testConnection = async (baseUrl: string, apiKey: string, model: string) => {
+    if (!baseUrl || !apiKey) {
+      toast.error("Please provide both Base URL and API Key");
+      return;
+    }
+    
+    // Strip trailing slash if present
+    const url = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    
+    const toastId = toast.loading("Testing connection...");
+    try {
+      if (window.pywebview?.api?.test_connection) {
+        const res = await window.pywebview.api.test_connection({
+          base_url: url,
+          api_key: apiKey,
+          model: model || "test-model"
+        });
+        
+        if (res.ok) {
+          toast.success("Connection successful!", { id: toastId });
+        } else {
+          toast.error(`Connection failed: ${res.error || "Unknown error"}`, { id: toastId });
+        }
+        return;
+      }
+
+      // Use local proxy to avoid CORS issues from browser/pywebview
+      const localBaseUrl = "http://127.0.0.1:1858";
+      const res = await fetch(`${localBaseUrl}/api/test-connection`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          base_url: url,
+          api_key: apiKey,
+          model: model || "test-model"
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok && data.ok) {
+        toast.success("Connection successful!", { id: toastId });
+      } else {
+        const errorMsg = data.error || `${res.status} ${res.statusText}`;
+        toast.error(`Connection failed: ${errorMsg}`, { id: toastId });
+        console.error("Test connection failed:", data);
+      }
+    } catch (e) {
+      toast.error(`Connection error: ${e instanceof Error ? e.message : String(e)}`, { id: toastId });
+    }
+  };
+
   // State for OpenRouter model fetching
   const [openRouterModels, setOpenRouterModels] = useState<OpenRouterModel[]>(
     []
@@ -74,6 +288,112 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const comboboxRef = useRef<HTMLDivElement>(null);
+
+  // New function to manually reload Qwen Settings from disk
+  const reloadCurrentModel = async () => {
+    try {
+      if (window.pywebview?.api?.get_qwen_settings) {
+        const toastId = toast.loading("Loading current model...");
+        const settings = await window.pywebview.api.get_qwen_settings();
+        setQwenSettingsFile(settings);
+        
+        if (settings && settings.security?.auth?.selectedType) {
+          const authType = settings.security.auth.selectedType;
+          const isOAuth = authType === "qwen-oauth";
+          
+          if (isOAuth) {
+            updateQwenConfig({
+              useOAuth: true,
+              model: "coder-model"
+            });
+            toast.success("Loaded: OAuth (coder-model)", { id: toastId });
+          } else if (settings.model && settings.model.name) {
+            const providers = settings.modelProviders?.openai || [];
+            const activeProviderId = settings.model.name;
+            const activeProviderConfig = providers.find((p: any) => p.id === activeProviderId);
+            
+            if (activeProviderConfig) {
+              const envKey = activeProviderConfig.envKey;
+              const apiKey = settings.env?.[envKey] || "";
+              const isThinking = activeProviderConfig.generationConfig?.extra_body?.enable_thinking === true;
+              
+              updateQwenConfig({
+                baseUrl: activeProviderConfig.baseUrl,
+                apiKey: apiKey,
+                model: activeProviderId,
+                useOAuth: false,
+                enableThinking: isThinking
+              });
+              toast.success(`Loaded: ${activeProviderId}`, { id: toastId });
+            } else {
+              updateQwenConfig({
+                model: activeProviderId,
+                useOAuth: false
+              });
+              toast.success(`Loaded: ${activeProviderId} (Custom)`, { id: toastId });
+            }
+          } else {
+             toast.info("No specific model found in settings", { id: toastId });
+          }
+        } else {
+          toast.info("Could not read auth type from settings", { id: toastId });
+        }
+      } else {
+         toast.error("Native API not available");
+      }
+    } catch (e) {
+      console.error("Failed to load current model", e);
+      toast.error("Failed to load current model");
+    }
+  };
+
+  const openSettingsFile = async () => {
+    try {
+      if (window.pywebview?.api?.open_qwen_settings_in_editor) {
+        const res = await window.pywebview.api.open_qwen_settings_in_editor();
+        if (!res.ok) {
+          toast.error(`Failed to open file: ${res.error}`);
+        }
+      } else {
+        toast.error("Native API not available");
+      }
+    } catch (e) {
+      console.error("Failed to open settings file", e);
+      toast.error("Failed to open settings file");
+    }
+  };
+
+  const openQwenFolder = async () => {
+    try {
+      if (window.pywebview?.api?.open_qwen_folder) {
+        const res = await window.pywebview.api.open_qwen_folder();
+        if (!res.ok) {
+          toast.error(`Failed to open folder: ${res.error}`);
+        }
+      } else {
+        toast.error("Native API not available");
+      }
+    } catch (e) {
+      console.error("Failed to open folder", e);
+      toast.error("Failed to open folder");
+    }
+  };
+
+  const openModelProvidersJson = async () => {
+    try {
+      if (window.pywebview?.api?.open_model_providers_json) {
+        const res = await window.pywebview.api.open_model_providers_json();
+        if (!res.ok) {
+          toast.error(`Failed to open file: ${res.error}`);
+        }
+      } else {
+        toast.error("Native API not available");
+      }
+    } catch (e) {
+      console.error("Failed to open model providers file", e);
+      toast.error("Failed to open file");
+    }
+  };
 
   // Close combobox when clicking outside
   useEffect(() => {
@@ -250,6 +570,26 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
             </Select>
           </div>
 
+          {/* Reply Font Size Input */}
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+              {t("conversations.replyFontSize")}
+            </label>
+            <Input
+              type="number"
+              min={10}
+              max={40}
+              value={replyFontSize}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (!isNaN(val)) {
+                  setReplyFontSize(val);
+                }
+              }}
+              className="w-full"
+            />
+          </div>
+
           {/* Backend Selector */}
           <div>
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
@@ -299,20 +639,109 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
               {!qwenConfig.useOAuth && (
                 <>
+                  {/* Provider Selector for Qwen */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">
+                      {t("conversations.provider")}
+                    </label>
+                    <Select
+                      value={
+                        jsonProviders.find((p) => p.url === qwenConfig.baseUrl)
+                          ?.id || "custom"
+                      }
+                      onValueChange={async (value) => {
+                        if (value === "custom") {
+                          // keep current base url or clear? let's keep it
+                          updateQwenConfig({ baseUrl: "", apiKey: "" });
+                        } else {
+                          const provider = jsonProviders.find(
+                            (p) => p.id === value
+                          );
+                          if (provider) {
+                            const updates: any = { baseUrl: provider.url, apiKey: "" }; // default to empty
+                            if (
+                              provider.models &&
+                              provider.models.length > 0
+                            ) {
+                              updates.model = provider.models[0];
+                            }
+                            
+                            // Try to find API Key in loaded Qwen Settings
+                            if (qwenSettingsFile && provider.env_key) {
+                                const key = qwenSettingsFile.env?.[provider.env_key];
+                                if (key) {
+                                    updates.apiKey = key;
+                                }
+                            }
+                            
+                            updateQwenConfig(updates);
+                            if (updates.model) {
+                              onModelChange?.(updates.model);
+                            }
+                          }
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select Provider" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {jsonProviders.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="custom">Custom</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <div>
                     <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">
                       {t("conversations.apiKey")}
                     </label>
-                    <Input
-                      type="password"
-                      value={qwenConfig.apiKey}
-                      onChange={(e) =>
-                        updateQwenConfig({
-                          apiKey: e.target.value,
-                        })
-                      }
-                      placeholder={t("conversations.apiKey")}
-                    />
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Input
+                          type={showQwenApiKey ? "text" : "password"}
+                          className="w-full pr-10"
+                          value={qwenConfig.apiKey}
+                          onChange={(e) =>
+                            updateQwenConfig({
+                              apiKey: e.target.value,
+                            })
+                          }
+                          placeholder={t("conversations.apiKey")}
+                        />
+                        <button
+                          type="button"
+                          className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
+                          onClick={() => setShowQwenApiKey(!showQwenApiKey)}
+                        >
+                          {showQwenApiKey ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={saveSettingsToQwenConfig}
+                      >
+                        Save
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                          testConnection(qwenConfig.baseUrl, qwenConfig.apiKey, qwenConfig.model || "");
+                        }}
+                      >
+                        Test
+                      </Button>
+                    </div>
                   </div>
 
                   <div>
@@ -337,13 +766,17 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     </label>
                     <Select
                       value={
-                        [
-                          "qwen-max",
-                          "qwen-plus",
-                          "qwen-turbo",
-                          "qwen-coder-plus",
-                          "qwen-coder-turbo",
-                        ].includes(qwenConfig.model || "")
+                        (
+                          jsonProviders.find(
+                            (p) => p.url === qwenConfig.baseUrl
+                          )?.models || [
+                            "qwen-max",
+                            "qwen-plus",
+                            "qwen-turbo",
+                            "qwen-coder-plus",
+                            "qwen-coder-turbo",
+                          ]
+                        ).includes(qwenConfig.model || "")
                           ? qwenConfig.model
                           : "custom"
                       }
@@ -351,9 +784,6 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                         if (value !== "custom") {
                           updateQwenConfig({ model: value });
                           onModelChange?.(value);
-                        } else {
-                          // If switching to custom, keep current value but show input
-                          // Or clear it? Let's keep it to allow editing
                         }
                       }}
                     >
@@ -361,32 +791,35 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                         <SelectValue placeholder="Select Model" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="qwen-max">
-                          Qwen Max (Flagship)
-                        </SelectItem>
-                        <SelectItem value="qwen-plus">
-                          Qwen Plus (Balanced)
-                        </SelectItem>
-                        <SelectItem value="qwen-turbo">
-                          Qwen Turbo (Fast)
-                        </SelectItem>
-                        <SelectItem value="qwen-coder-plus">
-                          Qwen Coder Plus
-                        </SelectItem>
-                        <SelectItem value="qwen-coder-turbo">
-                          Qwen Coder Turbo
-                        </SelectItem>
+                        {(
+                          jsonProviders.find(
+                            (p) => p.url === qwenConfig.baseUrl
+                          )?.models || [
+                            "qwen-max",
+                            "qwen-plus",
+                            "qwen-turbo",
+                            "qwen-coder-plus",
+                            "qwen-coder-turbo",
+                          ]
+                        ).map((m) => (
+                          <SelectItem key={m} value={m}>
+                            {m}
+                          </SelectItem>
+                        ))}
                         <SelectItem value="custom">Custom...</SelectItem>
                       </SelectContent>
                     </Select>
 
-                    {(![
-                      "qwen-max",
-                      "qwen-plus",
-                      "qwen-turbo",
-                      "qwen-coder-plus",
-                      "qwen-coder-turbo",
-                    ].includes(qwenConfig.model || "") ||
+                    {(!(
+                      jsonProviders.find((p) => p.url === qwenConfig.baseUrl)
+                        ?.models || [
+                        "qwen-max",
+                        "qwen-plus",
+                        "qwen-turbo",
+                        "qwen-coder-plus",
+                        "qwen-coder-turbo",
+                      ]
+                    ).includes(qwenConfig.model || "") ||
                       qwenConfig.model === "custom") && (
                       <Input
                         type="text"
@@ -415,6 +848,23 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                       className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
                     >
                       {t("conversations.yoloMode")}
+                    </label>
+                  </div>
+
+                  {/* Thinking Mode Checkbox */}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="qwen-thinking-checkbox"
+                      checked={qwenConfig.enableThinking || false}
+                      onCheckedChange={(checked) => {
+                        updateQwenConfig({ enableThinking: checked === true });
+                      }}
+                    />
+                    <label
+                      htmlFor="qwen-thinking-checkbox"
+                      className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+                    >
+                      Enable Thinking Mode (e.g. for DeepSeek-R1)
                     </label>
                   </div>
                 </>
@@ -639,13 +1089,34 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 </label>
                 <Select
                   value={llxprtConfig.provider}
-                  onValueChange={(value) => {
-                    // Auto-fill base URL for providers that need it
+                  onValueChange={async (value) => {
+                    // Check if it's a JSON provider
+                    const jsonProvider = jsonProviders.find(
+                      (p) => p.id === value
+                    );
+
                     const updates: Partial<typeof llxprtConfig> = {
                       provider: value as LLxprtProvider,
                     };
 
-                    if (value === "openrouter") {
+                    if (jsonProvider) {
+                      updates.baseUrl = jsonProvider.url;
+                      // Default to first model if available
+                      if (
+                        jsonProvider.models &&
+                        jsonProvider.models.length > 0
+                      ) {
+                        updates.model = jsonProvider.models[0];
+                      }
+                      
+                      // Fetch API key from settings if available
+                      if (jsonProvider.env_key && qwenSettingsFile?.env) {
+                        const envValue = qwenSettingsFile.env[jsonProvider.env_key];
+                        if (envValue) {
+                          updates.apiKey = envValue;
+                        }
+                      }
+                    } else if (value === "openrouter") {
                       updates.baseUrl = "https://openrouter.ai/api/v1";
                     } else if (
                       [
@@ -681,6 +1152,26 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     <SelectItem value="groq">Groq</SelectItem>
                     <SelectItem value="together">Together AI</SelectItem>
                     <SelectItem value="xai">xAI (Grok)</SelectItem>
+                    {/* JSON Providers */}
+                    {jsonProviders
+                      .filter(
+                        (p) =>
+                          ![
+                            "anthropic",
+                            "openai",
+                            "openrouter",
+                            "gemini",
+                            "qwen",
+                            "groq",
+                            "together",
+                            "xai",
+                          ].includes(p.id)
+                      )
+                      .map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
                     <SelectItem value="custom">
                       Custom OpenAI-compatible
                     </SelectItem>
@@ -693,16 +1184,63 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">
                   {t("conversations.apiKey")}
                 </label>
-                <Input
-                  type="password"
-                  value={llxprtConfig.apiKey}
-                  onChange={(e) =>
-                    updateLLxprtConfig({
-                      apiKey: e.target.value,
-                    })
-                  }
-                  placeholder="sk-..."
-                />
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      type={showLlxprtApiKey ? "text" : "password"}
+                      className="w-full pr-10"
+                      value={llxprtConfig.apiKey}
+                      onChange={(e) =>
+                        updateLLxprtConfig({
+                          apiKey: e.target.value,
+                        })
+                      }
+                      placeholder="sk-..."
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
+                      onClick={() => setShowLlxprtApiKey(!showLlxprtApiKey)}
+                    >
+                      {showLlxprtApiKey ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      // LLxprt save logic - keeping local for now or TODO implement generic saving
+                      // For now just notify user it's not implemented for LLxprt file saving yet
+                      toast.info("Saving to config file is currently optimized for Qwen backend.");
+                    }}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      // Determine base URL
+                      let url = llxprtConfig.baseUrl;
+                      if (!url) {
+                        if (llxprtConfig.provider === "openai") url = "https://api.openai.com/v1";
+                        else if (llxprtConfig.provider === "anthropic") url = "https://api.anthropic.com/v1";
+                        // add more defaults if needed
+                      }
+                      if (!url) {
+                        toast.error("Base URL is required to test connection");
+                        return;
+                      }
+                      testConnection(url, llxprtConfig.apiKey, llxprtConfig.model || "");
+                    }}
+                  >
+                    Test
+                  </Button>
+                </div>
               </div>
 
               {/* Model */}
@@ -792,6 +1330,32 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                       </div>
                     )}
                   </div>
+                ) : jsonProviders.some(
+                    (p) => p.id === llxprtConfig.provider
+                  ) ? (
+                  <Select
+                    value={llxprtConfig.model}
+                    onValueChange={(value) => {
+                      updateLLxprtConfig({ model: value });
+                      onModelChange?.(value);
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select Model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(
+                        jsonProviders.find(
+                          (p) => p.id === llxprtConfig.provider
+                        )?.models || []
+                      ).map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {m}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="custom">Custom...</SelectItem>
+                    </SelectContent>
+                  </Select>
                 ) : (
                   <Input
                     type="text"
@@ -852,6 +1416,76 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
               </p>
             </div>
           )}
+        </div>
+
+        <div className="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-800 mt-4">
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={reloadCurrentModel}
+              className="flex items-center gap-2"
+              title="Load current configuration from disk"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Current Model
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={openSettingsFile}
+              title="Open ~/.qwen/settings.json"
+            >
+              Config File
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={openQwenFolder}
+              title="Open ~/.qwen folder"
+            >
+              .qwen Folder
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={openModelProvidersJson}
+              title="Edit the dropdown model list"
+            >
+              Edit Model List
+            </Button>
+          </div>
+          
+          <Button
+            onClick={async () => {
+              // 1. Trigger model change event to inform the rest of the app
+              let modelToUse = "";
+              if (selectedBackend === "qwen") {
+                if (qwenConfig.useOAuth) {
+                  modelToUse = "coder-model";
+                } else {
+                  modelToUse = qwenConfig.model || "qwen-max";
+                }
+                // Save settings to Qwen config file
+                await saveSettingsToQwenConfig();
+              } else if (selectedBackend === "gemini") {
+                modelToUse = geminiConfig.defaultModel || "gemini-2.5-flash";
+              } else if (selectedBackend === "llxprt") {
+                modelToUse = llxprtConfig.model || "";
+              }
+              
+              if (onModelChange && modelToUse) {
+                onModelChange(modelToUse);
+              }
+              
+              // 2. Save state via Context (handled automatically by useEffect in BackendProvider)
+              
+              // 3. Close dialog
+              onOpenChange(false);
+            }}
+          >
+            Confirm
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

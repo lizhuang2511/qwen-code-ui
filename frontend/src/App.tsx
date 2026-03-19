@@ -26,6 +26,7 @@ import {
   useApiConfig,
   useBackend,
 } from "./contexts/BackendContext";
+import { SettingsProvider } from "./contexts/SettingsContext";
 import { getBackendText } from "./utils/backendText";
 import { HomeDashboard } from "./pages/HomeDashboard";
 import ProjectsPage from "./pages/Projects";
@@ -71,8 +72,34 @@ function RootLayoutContent() {
   // Check if we are on the project detail page
   const isProjectDetailPage = /^\/projects\/[^/]+$/.test(location.pathname);
 
-  const [selectedModel, setSelectedModel] =
-    useState<string>("gemini-2.5-flash");
+  // Use backend context instead of local state
+  const { apiConfig } = useApiConfig();
+  const { selectedBackend, state: backendState } = useBackend();
+
+  // Load initial model from backend context instead of hardcoding
+  const [selectedModel, setSelectedModel] = useState<string>("");
+
+  // Sync initial model from backend state once it's loaded
+  useEffect(() => {
+    // Only update if selectedModel is empty or doesn't match the backend state 
+    // AND the backend state is actually initialized (not using default qwen-max if OAuth is false)
+    if (backendState.selectedBackend === "qwen") {
+      const targetModel = backendState.configs.qwen.useOAuth ? "coder-model" : (backendState.configs.qwen.model || "qwen-max");
+      // Don't auto-override if the UI already has the correct state from Context
+      // This prevents the "flash" to OAuth if localStorage had it but settings.json says otherwise
+      if (selectedModel !== targetModel) {
+        setSelectedModel(targetModel);
+      }
+    } else if (backendState.selectedBackend === "gemini") {
+      if (selectedModel !== backendState.configs.gemini.defaultModel) {
+        setSelectedModel(backendState.configs.gemini.defaultModel || "gemini-2.5-flash");
+      }
+    } else if (backendState.selectedBackend === "llxprt") {
+      if (selectedModel !== backendState.configs.llxprt.model) {
+        setSelectedModel(backendState.configs.llxprt.model || "");
+      }
+    }
+  }, [backendState.selectedBackend, backendState.configs, selectedModel]);
   const [cliIOLogs, setCliIOLogs] = useState<CliIO[]>([]);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -108,10 +135,6 @@ function RootLayoutContent() {
     };
     getCurrentWorkingDirectory();
   }, []);
-
-  // Use backend context instead of local state
-  const { apiConfig } = useApiConfig();
-  const { selectedBackend, state: backendState } = useBackend();
 
   // Set document title based on selected backend
   useEffect(() => {
@@ -310,6 +333,7 @@ function RootLayoutContent() {
         let geminiAuth;
 
         // For Qwen backend, pass full backend_config
+        // For LLxprt backend, pass full backend_config
         // For Gemini backend, pass geminiAuth with the appropriate configuration
         if (selectedBackend === "qwen") {
           // Always ensure backend_config is set for Qwen to trigger qwen CLI
@@ -317,6 +341,12 @@ function RootLayoutContent() {
             // Tauri auto-converts to backend_config
             api_key: apiConfig?.api_key || "", // Empty string if OAuth
             base_url: apiConfig?.base_url || "https://openrouter.ai/api/v1",
+            model: apiConfig?.model || selectedModel,
+          };
+        } else if (selectedBackend === "llxprt") {
+          backendConfig = {
+            api_key: apiConfig?.api_key || "",
+            base_url: apiConfig?.base_url || "",
             model: apiConfig?.model || selectedModel,
           };
         } else if (selectedBackend === "gemini") {
@@ -384,8 +414,10 @@ function RootLayoutContent() {
 
         const modelForBackend =
           selectedBackend === "qwen"
-            ? backendState.configs.qwen.model || "qwen/qwen3-coder:free"
-            : selectedModel;
+            ? (backendState.configs.qwen.useOAuth ? "coder-model" : (backendState.configs.qwen.model || "qwen-max"))
+            : selectedBackend === "llxprt"
+              ? backendState.configs.llxprt.model || selectedModel
+              : selectedModel;
         console.log("🚀 [APP] Starting session", {
           sessionId: convId,
           workingDirectory,
@@ -694,9 +726,11 @@ function RootLayoutInner() {
 
 function RootLayout() {
   return (
-    <BackendProvider>
-      <RootLayoutInner />
-    </BackendProvider>
+    <SettingsProvider>
+      <BackendProvider>
+        <RootLayoutInner />
+      </BackendProvider>
+    </SettingsProvider>
   );
 }
 

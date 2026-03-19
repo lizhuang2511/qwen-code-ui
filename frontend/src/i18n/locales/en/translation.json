@@ -167,6 +167,7 @@
     "selectBackend": "Select Backend",
     "language": "Language",
     "selectLanguage": "Select Language",
+    "replyFontSize": "Reply Text Font Size (px)",
     "model": "Model",
     "selectModel": "Select Model",
     "authMethod": "Authentication Method",

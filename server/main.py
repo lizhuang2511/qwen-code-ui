@@ -4,12 +4,28 @@ import sys
 import json
 import asyncio
 import logging
+from pathlib import Path
+from dotenv import load_dotenv, set_key
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 # Add crates to path
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "crates"))
+
+# Load .env file
+BASE_DIR = Path(__file__).resolve().parent.parent
+ENV_FILE = BASE_DIR / ".env"
+
+# Auto-create .env file if it doesn't exist
+if not ENV_FILE.exists():
+    try:
+        ENV_FILE.touch()
+        logger.info(f"Created missing .env file at {ENV_FILE}")
+    except Exception as e:
+        logger.error(f"Failed to create .env file: {e}")
+
+load_dotenv(ENV_FILE)
 
 from crates.filesystem import get_home_directory
 from crates.session import get_process_statuses, start_session, send_message, kill_process
@@ -20,7 +36,7 @@ import crates.backend.version_utils as version_utils
 app = FastAPI()
 logger = logging.getLogger("app")
 
-origins = ["http://localhost:1420", "http://127.0.0.1:1420"]
+origins = ["http://localhost:1420", "http://127.0.0.1:1420", "tauri://localhost", "https://tauri.localhost"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -101,13 +117,13 @@ class ProjectRequest(BaseModel):
 @app.post("/api/project")
 def api_upsert_project(req: ProjectRequest) -> Dict[str, Any]:
     name = os.path.basename(req.root_path) if req.root_path else "Project"
-    projects.upsert_project(req.sha256, req.root_path, name)
+    pid = projects.ensure_project(req.root_path)
     return {
-        "sha256": req.sha256,
+        "sha256": pid,
         "root_path": req.root_path,
         "metadata": {
             "path": req.root_path,
-            "sha256": req.sha256,
+            "sha256": pid,
             "friendly_name": name,
         },
     }
@@ -243,4 +259,116 @@ def api_save_excluded_paths(req: ExcludedPathsRequest) -> bool:
     if req.excluded is None:
         return False
     return version_utils.update_excluded_paths(req.path, req.excluded)
+
+@app.get("/api/model-providers")
+def api_get_model_providers():
+    model_providers_file = BASE_DIR / "model_providers.json"
+    if not model_providers_file.exists():
+        return {"providers": []}
+    try:
+        with open(model_providers_file, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to read model providers: {e}")
+        return {"providers": [], "error": str(e)}
+
+class EnvConfig(BaseModel):
+    key: str
+    value: str
+
+@app.post("/api/save-env-config")
+def api_save_env_config(config: EnvConfig):
+    try:
+        # If file doesn't exist, create it
+        if not ENV_FILE.exists():
+            ENV_FILE.touch()
+            
+        logger.info(f"Saving to env file: {ENV_FILE}")
+        
+        # Use set_key to update .env file
+        success, key, value = set_key(str(ENV_FILE), config.key, config.value)
+        
+        # If set_key fails or returns False/None, we can try to append it manually
+        if not success:
+            with open(ENV_FILE, "a", encoding="utf-8") as f:
+                f.write(f"\n{config.key}='{config.value}'\n")
+            success = True
+            
+        # Reload env to update os.environ for current process
+        load_dotenv(ENV_FILE, override=True)
+        
+        return {"ok": success}
+    except Exception as e:
+        logger.error(f"Failed to save env config: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.get("/api/get-env-config")
+def api_get_env_config(key: str):
+    try:
+        # Load from .env file directly if it exists
+        import dotenv
+        env_dict = dotenv.dotenv_values(ENV_FILE)
+        value = env_dict.get(key)
+        
+        if value is None:
+            # Fallback to os.environ
+            value = os.environ.get(key, "")
+            
+        return {"value": value}
+    except Exception as e:
+        logger.error(f"Failed to get env config: {e}")
+        return {"value": ""}
+
+class TestConnectionRequest(BaseModel):
+    base_url: str
+    api_key: str
+    model: str
+
+@app.post("/api/test-connection")
+def api_test_connection(req: TestConnectionRequest):
+    import urllib.request
+    import urllib.error
+    
+    # Ensure base_url doesn't end with slash
+    base_url = req.base_url.rstrip("/")
+    url = f"{base_url}/chat/completions"
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {req.api_key}",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    
+    # Some providers strictly require stream parameter
+    data = json.dumps({
+        "model": req.model,
+        "messages": [{"role": "user", "content": "Hello"}],
+        "max_tokens": 5,
+        "stream": False
+    }).encode("utf-8")
+    
+    logger.info(f"Testing connection to {url} with model {req.model}")
+    
+    try:
+        request = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        with urllib.request.urlopen(request, timeout=15) as response:
+            response_body = response.read().decode("utf-8")
+            logger.info(f"Connection test success: {response.status}")
+            response_data = json.loads(response_body)
+            return {"ok": True, "data": response_data}
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8")
+        logger.error(f"Test connection HTTPError: {e.code} - {error_body}")
+        # Try to parse error body as JSON to get more details
+        try:
+            error_json = json.loads(error_body)
+            if "error" in error_json:
+                error_msg = error_json["error"].get("message", str(error_json["error"]))
+                return {"ok": False, "error": f"HTTP {e.code}: {error_msg}"}
+        except:
+            pass
+        return {"ok": False, "error": f"HTTP {e.code}: {error_body[:200]}"}
+    except Exception as e:
+        logger.error(f"Test connection error: {e}")
+        return {"ok": False, "error": str(e)}
 

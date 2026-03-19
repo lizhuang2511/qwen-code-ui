@@ -182,6 +182,67 @@ export const BackendProvider: React.FC<BackendProviderProps> = ({
     loadFromStorage()
   );
 
+  // Sync state with ~/.qwen/settings.json on initialization
+  useEffect(() => {
+    const syncWithQwenSettings = async () => {
+      try {
+        if (window.pywebview?.api?.get_qwen_settings) {
+          const settings = await window.pywebview.api.get_qwen_settings();
+          if (settings) {
+            // Check auth type to determine if OAuth is used
+            const authType = settings.security?.auth?.selectedType;
+            const useOAuth = authType === "qwen-oauth";
+            const currentModelName = settings.model?.name;
+            
+            // If OAuth is selected, update config
+            if (useOAuth) {
+              dispatch({
+                type: "UPDATE_CONFIG",
+                backend: "qwen",
+                config: { useOAuth: true, model: "coder-model" }
+              });
+            } else if (currentModelName) {
+              // Custom model
+              // Find the corresponding provider config to get baseUrl and apiKey
+              const providers = settings.modelProviders?.openai || [];
+              const providerConfig = providers.find((p: any) => p.id === currentModelName);
+              
+              if (providerConfig) {
+                const envKey = providerConfig.envKey;
+                // Try to get from settings.env first, but don't overwrite if we already have it in localStorage and it's missing here
+                const apiKey = settings.env?.[envKey] || "";
+                const isThinking = providerConfig.generationConfig?.extra_body?.enable_thinking === true;
+                
+                dispatch({
+                  type: "UPDATE_CONFIG",
+                  backend: "qwen",
+                  config: { 
+                    useOAuth: false, 
+                    model: currentModelName,
+                    baseUrl: providerConfig.baseUrl,
+                    ...(apiKey ? { apiKey } : {}), // Only update apiKey if found
+                    enableThinking: isThinking
+                  }
+                });
+              } else {
+                 // Fallback if provider not found but model is set
+                 dispatch({
+                  type: "UPDATE_CONFIG",
+                  backend: "qwen",
+                  config: { useOAuth: false, model: currentModelName }
+                });
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Failed to sync with Qwen settings:", error);
+      }
+    };
+    
+    syncWithQwenSettings();
+  }, []);
+
   // Save to localStorage on state changes
   useEffect(() => {
     saveToStorage(state);
@@ -224,16 +285,13 @@ export const BackendProvider: React.FC<BackendProviderProps> = ({
         ? (currentConfig as GeminiConfig).defaultModel
         : state.selectedBackend === "llxprt"
           ? (currentConfig as LLxprtConfig).model
-          : state.selectedBackend === "qwen" &&
-            (currentConfig as QwenConfig).useOAuth
-            ? "qwenfree"
-            : (currentConfig as QwenConfig).model;
+          : (currentConfig as QwenConfig).model;
 
     const getApiConfig = (): ApiConfig | null => {
       if (state.selectedBackend === "qwen") {
         const qwenConfig = state.configs.qwen;
         if (qwenConfig.useOAuth) {
-          return { model: "qwenfree" };
+          return { model: qwenConfig.model || "qwen-max" };
         } else {
           return {
             api_key: qwenConfig.apiKey,

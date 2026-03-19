@@ -36,10 +36,86 @@ export const useMessageHandler = ({
   setupEventListenerForConversation,
   fetchProcessStatuses,
 }: UseMessageHandlerProps) => {
-  const [input, setInput] = useState("");
-  const [approvalMode, setApprovalMode] = useState<string>("default");
+  const [inputState, setInputState] = useState<Record<string, string>>({});
+  const [approvalModeState, setApprovalModeState] = useState<Record<string, string>>({});
   const conversationModes = React.useRef<Record<string, string>>({});
   const { selectedBackend, getApiConfig, state: backendState } = useBackend();
+
+  // Get current values based on active conversation or defaults
+  const currentInput = activeConversation ? (inputState[activeConversation] || "") : (inputState["new"] || "");
+  const currentApprovalMode = activeConversation ? (approvalModeState[activeConversation] || "default") : (approvalModeState["new"] || "default");
+
+  const setInput = useCallback((value: string) => {
+    setInputState(prev => ({
+      ...prev,
+      [activeConversation || "new"]: value
+    }));
+  }, [activeConversation]);
+
+  const setApprovalMode = useCallback(async (value: string) => {
+    setApprovalModeState(prev => ({
+      ...prev,
+      [activeConversation || "new"]: value
+    }));
+
+    if (!activeConversation) return;
+
+    const convId = activeConversation;
+    const currentMode = conversationModes.current[convId] || "default";
+
+    if (value !== currentMode) {
+        console.log(`[useMessageHandler] Restarting session to switch mode from ${currentMode} to ${value} for session ${convId}`);
+        
+        try {
+          const apiConfig = getApiConfig();
+          const isYolo = value === "yolo" || value === "auto-edit";
+          
+          let backendConfig = undefined;
+
+          if (selectedBackend === "qwen") {
+            backendConfig = {
+              api_key: apiConfig?.api_key || "",
+              base_url: apiConfig?.base_url || "https://openrouter.ai/api/v1",
+              model: selectedModel,
+              yolo: isYolo,
+            };
+          }
+
+          const existing = conversations.find((c) => c.id === convId);
+          const wd = existing?.workingDirectory || ".";
+
+          await api.start_session({
+            sessionId: convId,
+            workingDirectory: wd,
+            model: selectedModel,
+            backend: selectedBackend,
+            backendConfig: backendConfig,
+          });
+          
+          conversationModes.current[convId] = value;
+          
+          updateConversation(convId, (conv) => {
+            conv.messages.push({
+              id: Date.now().toString(),
+              parts: [{ type: "text", text: `🔄 **System:** Session restarted in **${value}** mode.` }],
+              sender: "assistant",
+              timestamp: new Date(),
+            });
+          });
+
+        } catch (error) {
+          console.error("Failed to restart session for approval mode:", error);
+           updateConversation(convId, (conv) => {
+            conv.messages.push({
+              id: Date.now().toString(),
+              parts: [{ type: "text", text: `❌ **Error:** Failed to switch mode: ${error}` }],
+              sender: "assistant",
+              timestamp: new Date(),
+            });
+          });
+        }
+    }
+  }, [activeConversation, conversations, getApiConfig, selectedModel, selectedBackend, updateConversation]);
 
   const handleInputChange = useCallback(
     (
@@ -50,7 +126,7 @@ export const useMessageHandler = ({
     ) => {
       setInput(newValue);
     },
-    []
+    [setInput]
   );
 
   const generateTitleIfNeeded = useCallback(
@@ -81,83 +157,11 @@ export const useMessageHandler = ({
     [selectedModel, updateConversation]
   );
 
-  const handleApprovalModeChange = useCallback(
-    async (newMode: string) => {
-      setApprovalMode(newMode);
-      
-      if (!activeConversation) {
-        return;
-      }
-      
-      const convId = activeConversation;
-      const currentMode = conversationModes.current[convId] || "default";
-      
-      if (newMode !== currentMode) {
-        console.log(`[useMessageHandler] Restarting session to switch mode from ${currentMode} to ${newMode} for session ${convId}`);
-        
-        try {
-          // Get backend configuration to ensure consistency
-          const apiConfig = getApiConfig();
-          const qwenCfg = backendState.configs.qwen;
-          
-          // Determine yolo setting based on mode
-          const isYolo = newMode === "yolo" || newMode === "auto-edit";
-          
-          const backendConfig = {
-            api_key: apiConfig?.api_key || "",
-            base_url: apiConfig?.base_url || "https://openrouter.ai/api/v1",
-            model: qwenCfg.model || apiConfig?.model || "qwen/qwen3-coder:free",
-            yolo: isYolo,
-          };
-
-          // Find current conversation to get working directory
-          const existing = conversations.find((c) => c.id === convId);
-          const wd = existing?.workingDirectory || ".";
-
-          // Restart session with new configuration
-          // This will kill the old process in backend and start a new one with the same ID
-          await api.start_session({
-            sessionId: convId,
-            workingDirectory: wd,
-            model: selectedModel,
-            backend: selectedBackend,
-            backendConfig: backendConfig,
-            // Pass other configs as undefined to rely on backend handling
-          });
-          
-          conversationModes.current[convId] = newMode;
-          
-          // Optional: Add a system message to UI to indicate restart
-          updateConversation(convId, (conv) => {
-            conv.messages.push({
-              id: Date.now().toString(),
-              parts: [{ type: "text", text: `🔄 **System:** Session restarted in **${newMode}** mode.` }],
-              sender: "assistant",
-              timestamp: new Date(),
-            });
-          });
-
-        } catch (error) {
-          console.error("Failed to restart session for approval mode:", error);
-           updateConversation(convId, (conv) => {
-            conv.messages.push({
-              id: Date.now().toString(),
-              parts: [{ type: "text", text: `❌ **Error:** Failed to switch mode: ${error}` }],
-              sender: "assistant",
-              timestamp: new Date(),
-            });
-          });
-        }
-      }
-    },
-    [activeConversation, conversations, getApiConfig, backendState.configs.qwen, selectedModel, selectedBackend, updateConversation]
-  );
-
   const handleSendMessage = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
 
-      if (!input.trim() || !isCliInstalled) {
+      if (!currentInput.trim() || !isCliInstalled) {
         return;
       }
 
@@ -166,7 +170,7 @@ export const useMessageHandler = ({
         parts: [
           {
             type: "text",
-            text: input,
+            text: currentInput,
           },
         ],
         sender: "user",
@@ -194,13 +198,13 @@ export const useMessageHandler = ({
         // Use timestamp that matches backend log file naming convention
         const timestamp = Date.now();
         convId = timestamp.toString();
-        createNewConversation(convId, input.slice(0, 50), [newMessage], true);
+        createNewConversation(convId, currentInput.slice(0, 50), [newMessage], true);
         setActiveConversation(convId);
         // IMPORTANT: Wait for event listeners to be fully set up before proceeding
         await setupEventListenerForConversation(convId);
       }
 
-      const messageText = input;
+      const messageText = currentInput;
 
       setInput("");
 
@@ -237,7 +241,7 @@ export const useMessageHandler = ({
           const qwenCfg = backendState.configs.qwen;
           
           // Determine yolo based on current approvalMode state
-          const isYolo = approvalMode === "yolo" || approvalMode === "auto-edit";
+          const isYolo = currentApprovalMode === "yolo" || currentApprovalMode === "auto-edit";
           
           backendConfig = {
             api_key: apiConfig?.api_key || "", // Empty string if OAuth
@@ -284,16 +288,20 @@ export const useMessageHandler = ({
 
         // Session progress will be handled by useSessionProgress hook
         // which should be integrated at the component level
+        const modelForBackend =
+          selectedBackend === "qwen"
+            ? backendState.configs.qwen.model || "qwen/qwen3-coder:free"
+            : selectedBackend === "llxprt"
+              ? backendState.configs.llxprt.model || selectedModel
+              : selectedModel;
+
         const existing = conversations.find((c) => c.id === convId);
         if (!existing?.isActive) {
           const wd = existing?.workingDirectory || ".";
           await api.start_session({
             sessionId: convId,
             workingDirectory: wd,
-            model:
-              selectedBackend === "qwen"
-                ? backendState.configs.qwen.model || "qwen/qwen3-coder:free"
-                : selectedModel,
+            model: modelForBackend,
             backendConfig,
             geminiAuth,
             llxprtConfig,
@@ -304,18 +312,10 @@ export const useMessageHandler = ({
         const currentMode = conversationModes.current[convId] || "default";
         // If mode in UI (approvalMode) is different from what we think backend has (currentMode),
         // sync it now. This handles cases where session wasn't active when user changed dropdown.
-        if (approvalMode !== currentMode) {
-          console.log(`[useMessageHandler] Syncing approval mode before message: ${currentMode} -> ${approvalMode}`);
-          // Instead of sending command, we rely on session restart if needed.
-          // But here, inside sendMessage, we might not want to restart. 
-          // If we reached here, it means session IS active.
-          // If user changed mode via dropdown, handleApprovalModeChange would have triggered restart.
-          // So this block might be redundant or just a fallback for "new session" case.
-          // For new session, start_session above uses backendConfig which we need to set correctly.
-          
-          // Wait, backendConfig above is constructed from state, NOT from approvalMode for yolo!
-          // We need to fix backendConfig construction in handleSendMessage too.
-          conversationModes.current[convId] = approvalMode;
+        if (currentApprovalMode !== currentMode) {
+          console.log(`[useMessageHandler] Syncing approval mode before message: ${currentMode} -> ${currentApprovalMode}`);
+          // Update ref to track current state
+          conversationModes.current[convId] = currentApprovalMode;
         }
 
         await api.send_message({
@@ -342,8 +342,8 @@ export const useMessageHandler = ({
       }
     },
     [
-      input,
-      approvalMode,
+      currentInput,
+      currentApprovalMode,
       isCliInstalled,
       activeConversation,
       conversations,
@@ -359,16 +359,16 @@ export const useMessageHandler = ({
       setupEventListenerForConversation,
       fetchProcessStatuses,
       generateTitleIfNeeded,
-      handleApprovalModeChange // Add dependency
+      setInput,
     ]
   );
 
   return {
-    input,
+    input: currentInput,
     setInput,
     handleInputChange,
     handleSendMessage,
-    approvalMode,
-    setApprovalMode: handleApprovalModeChange,
+    approvalMode: currentApprovalMode,
+    setApprovalMode,
   };
 };
