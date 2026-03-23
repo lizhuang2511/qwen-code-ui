@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { useBackend, useBackendConfig } from "@/contexts/BackendContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { GeminiAuthMethod, LLxprtProvider } from "@/types/backend";
+import { api } from "@/lib/api";
 
 interface ModelProvider {
   id: string;
@@ -116,18 +117,10 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       const fetchData = async () => {
         // 1. Fetch Providers
         try {
-          if (window.pywebview?.api?.get_model_providers) {
-            console.log("Fetching model providers via pywebview API");
-            const data = await window.pywebview.api.get_model_providers();
-            if (data.providers) {
-              setJsonProviders(data.providers);
-            }
-          } else {
-             // Fallback fetch
-             const baseUrl = "http://127.0.0.1:1858";
-             const res = await fetch(`${baseUrl}/api/model-providers`);
-             const data = await res.json();
-             if (data.providers) setJsonProviders(data.providers);
+          console.log("Fetching model providers via API");
+          const data = await api.get_model_providers();
+          if (data.providers) {
+            setJsonProviders(data.providers);
           }
         } catch (e) {
           console.error("Failed to load model providers", e);
@@ -135,10 +128,9 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
         // 2. Fetch Qwen Settings
         try {
-          if (window.pywebview?.api?.get_qwen_settings) {
-            const settings = await window.pywebview.api.get_qwen_settings();
-            console.log("Loaded Qwen Settings:", settings);
-            setQwenSettingsFile(settings);
+          const settings = await api.get_qwen_settings();
+          console.log("Loaded Qwen Settings:", settings);
+          setQwenSettingsFile(settings);
             
             // Sync current config with settings file if applicable
             if (settings && settings.security?.auth?.selectedType) {
@@ -176,7 +168,6 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 }
               }
             }
-          }
         } catch (e) {
           console.error("Failed to load qwen settings", e);
         }
@@ -201,24 +192,20 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     const targetModelId = qwenConfig.useOAuth ? "coder-model" : (qwenConfig.model || "custom-model");
     
     try {
-      if (window.pywebview?.api?.update_qwen_settings) {
-        const res = await window.pywebview.api.update_qwen_settings({
-          provider_id: targetModelId,
-          provider_name: providerName, 
-          base_url: qwenConfig.baseUrl,
-          api_key: qwenConfig.apiKey,
-          env_key: envKey, // Undefined if custom, triggering backend auto-generation
-          use_oauth: qwenConfig.useOAuth,
-          enable_thinking: qwenConfig.enableThinking
-        });
-        
-        if (res.ok) {
-          toast.success(`Settings saved to ~/.qwen/settings.json`);
-        } else {
-          toast.error(`Failed to save: ${res.error || "Unknown error"}`);
-        }
+      const res = await api.update_qwen_settings({
+        provider_id: targetModelId,
+        provider_name: providerName, 
+        base_url: qwenConfig.baseUrl,
+        api_key: qwenConfig.apiKey,
+        env_key: envKey, // Undefined if custom, triggering backend auto-generation
+        use_oauth: qwenConfig.useOAuth,
+        enable_thinking: qwenConfig.enableThinking
+      });
+      
+      if (res.ok) {
+        toast.success(`Settings saved to ~/.qwen/settings.json`);
       } else {
-        toast.error("Native settings API not available");
+        toast.error(`Failed to save: ${res.error || "Unknown error"}`);
       }
     } catch (e) {
       console.error("Failed to save settings", e);
@@ -238,43 +225,16 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     
     const toastId = toast.loading("Testing connection...");
     try {
-      if (window.pywebview?.api?.test_connection) {
-        const res = await window.pywebview.api.test_connection({
-          base_url: url,
-          api_key: apiKey,
-          model: model || "test-model"
-        });
-        
-        if (res.ok) {
-          toast.success("Connection successful!", { id: toastId });
-        } else {
-          toast.error(`Connection failed: ${res.error || "Unknown error"}`, { id: toastId });
-        }
-        return;
-      }
-
-      // Use local proxy to avoid CORS issues from browser/pywebview
-      const localBaseUrl = "http://127.0.0.1:1858";
-      const res = await fetch(`${localBaseUrl}/api/test-connection`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          base_url: url,
-          api_key: apiKey,
-          model: model || "test-model"
-        })
+      const res = await api.test_connection({
+        base_url: url,
+        api_key: apiKey,
+        model: model || "test-model"
       });
       
-      const data = await res.json();
-      
-      if (res.ok && data.ok) {
+      if (res.ok) {
         toast.success("Connection successful!", { id: toastId });
       } else {
-        const errorMsg = data.error || `${res.status} ${res.statusText}`;
-        toast.error(`Connection failed: ${errorMsg}`, { id: toastId });
-        console.error("Test connection failed:", data);
+        toast.error(`Connection failed: ${res.error || "Unknown error"}`, { id: toastId });
       }
     } catch (e) {
       toast.error(`Connection error: ${e instanceof Error ? e.message : String(e)}`, { id: toastId });
@@ -292,54 +252,50 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   // New function to manually reload Qwen Settings from disk
   const reloadCurrentModel = async () => {
     try {
-      if (window.pywebview?.api?.get_qwen_settings) {
-        const toastId = toast.loading("Loading current model...");
-        const settings = await window.pywebview.api.get_qwen_settings();
-        setQwenSettingsFile(settings);
+      const toastId = toast.loading("Loading current model...");
+      const settings = await api.get_qwen_settings();
+      setQwenSettingsFile(settings);
+      
+      if (settings && settings.security?.auth?.selectedType) {
+        const authType = settings.security.auth.selectedType;
+        const isOAuth = authType === "qwen-oauth";
         
-        if (settings && settings.security?.auth?.selectedType) {
-          const authType = settings.security.auth.selectedType;
-          const isOAuth = authType === "qwen-oauth";
+        if (isOAuth) {
+          updateQwenConfig({
+            useOAuth: true,
+            model: "coder-model"
+          });
+          toast.success("Loaded: OAuth (coder-model)", { id: toastId });
+        } else if (settings.model && settings.model.name) {
+          const providers = settings.modelProviders?.openai || [];
+          const activeProviderId = settings.model.name;
+          const activeProviderConfig = providers.find((p: any) => p.id === activeProviderId);
           
-          if (isOAuth) {
-            updateQwenConfig({
-              useOAuth: true,
-              model: "coder-model"
-            });
-            toast.success("Loaded: OAuth (coder-model)", { id: toastId });
-          } else if (settings.model && settings.model.name) {
-            const providers = settings.modelProviders?.openai || [];
-            const activeProviderId = settings.model.name;
-            const activeProviderConfig = providers.find((p: any) => p.id === activeProviderId);
+          if (activeProviderConfig) {
+            const envKey = activeProviderConfig.envKey;
+            const apiKey = settings.env?.[envKey] || "";
+            const isThinking = activeProviderConfig.generationConfig?.extra_body?.enable_thinking === true;
             
-            if (activeProviderConfig) {
-              const envKey = activeProviderConfig.envKey;
-              const apiKey = settings.env?.[envKey] || "";
-              const isThinking = activeProviderConfig.generationConfig?.extra_body?.enable_thinking === true;
-              
-              updateQwenConfig({
-                baseUrl: activeProviderConfig.baseUrl,
-                apiKey: apiKey,
-                model: activeProviderId,
-                useOAuth: false,
-                enableThinking: isThinking
-              });
-              toast.success(`Loaded: ${activeProviderId}`, { id: toastId });
-            } else {
-              updateQwenConfig({
-                model: activeProviderId,
-                useOAuth: false
-              });
-              toast.success(`Loaded: ${activeProviderId} (Custom)`, { id: toastId });
-            }
+            updateQwenConfig({
+              baseUrl: activeProviderConfig.baseUrl,
+              apiKey: apiKey,
+              model: activeProviderId,
+              useOAuth: false,
+              enableThinking: isThinking
+            });
+            toast.success(`Loaded: ${activeProviderId}`, { id: toastId });
           } else {
-             toast.info("No specific model found in settings", { id: toastId });
+            updateQwenConfig({
+              model: activeProviderId,
+              useOAuth: false
+            });
+            toast.success(`Loaded: ${activeProviderId} (Custom)`, { id: toastId });
           }
         } else {
-          toast.info("Could not read auth type from settings", { id: toastId });
+           toast.info("No specific model found in settings", { id: toastId });
         }
       } else {
-         toast.error("Native API not available");
+        toast.info("Could not read auth type from settings", { id: toastId });
       }
     } catch (e) {
       console.error("Failed to load current model", e);
@@ -349,13 +305,9 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
   const openSettingsFile = async () => {
     try {
-      if (window.pywebview?.api?.open_qwen_settings_in_editor) {
-        const res = await window.pywebview.api.open_qwen_settings_in_editor();
-        if (!res.ok) {
-          toast.error(`Failed to open file: ${res.error}`);
-        }
-      } else {
-        toast.error("Native API not available");
+      const res = await api.open_qwen_settings_in_editor();
+      if (!res.ok) {
+        toast.error(`Failed to open file: ${res.error}`);
       }
     } catch (e) {
       console.error("Failed to open settings file", e);
@@ -365,13 +317,9 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
   const openQwenFolder = async () => {
     try {
-      if (window.pywebview?.api?.open_qwen_folder) {
-        const res = await window.pywebview.api.open_qwen_folder();
-        if (!res.ok) {
-          toast.error(`Failed to open folder: ${res.error}`);
-        }
-      } else {
-        toast.error("Native API not available");
+      const res = await api.open_qwen_folder();
+      if (!res.ok) {
+        toast.error(`Failed to open folder: ${res.error}`);
       }
     } catch (e) {
       console.error("Failed to open folder", e);
@@ -381,13 +329,9 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
   const openModelProvidersJson = async () => {
     try {
-      if (window.pywebview?.api?.open_model_providers_json) {
-        const res = await window.pywebview.api.open_model_providers_json();
-        if (!res.ok) {
-          toast.error(`Failed to open file: ${res.error}`);
-        }
-      } else {
-        toast.error("Native API not available");
+      const res = await api.open_model_providers_json();
+      if (!res.ok) {
+        toast.error(`Failed to open file: ${res.error}`);
       }
     } catch (e) {
       console.error("Failed to open model providers file", e);

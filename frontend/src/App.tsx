@@ -42,6 +42,7 @@ import { useConversationEvents } from "./hooks/useConversationEvents";
 import { useCliInstallation } from "./hooks/useCliInstallation";
 import { useSessionProgress } from "./hooks/useSessionProgress";
 import { useResizable } from "./hooks/useResizable";
+import { useIsMobile } from "./hooks/use-mobile";
 import { CliIO, Conversation, Message } from "./types";
 import "./index.css";
 import { getPlatform } from "./lib/runtime";
@@ -71,6 +72,8 @@ function RootLayoutContent() {
   const isHomePage = location.pathname === "/";
   // Check if we are on the project detail page
   const isProjectDetailPage = /^\/projects\/[^/]+$/.test(location.pathname);
+
+  const isMobile = useIsMobile();
 
   // Use backend context instead of local state
   const { apiConfig } = useApiConfig();
@@ -136,7 +139,18 @@ function RootLayoutContent() {
       try {
         const cwd = await api.get_home_directory();
         console.log("🏠 [App] Got home directory from API:", cwd);
-        setWorkingDirectory(cwd);
+        if (cwd && typeof cwd === 'string' && cwd.trim() !== '' && cwd !== '.') {
+          setWorkingDirectory(cwd);
+        } else {
+          // If it's literally '.', we might want to fallback or keep it if it's correct
+          // But usually we want an absolute path for projects.
+          if (cwd === '.') {
+             console.warn("🏠 [App] Got '.' as home directory, using as is but this might be incorrect.");
+             setWorkingDirectory(cwd);
+          } else {
+             throw new Error("Invalid cwd returned: " + String(cwd));
+          }
+        }
       } catch (error) {
         console.warn(
           "🏠 [App] Failed to get working directory, using current directory:",
@@ -155,10 +169,7 @@ function RootLayoutContent() {
 
     // Also update native window title on desktop platforms
     if (!__WEB__ && isPywebview()) {
-      const api = (window as any).pywebview?.api;
-      if (api && typeof api.set_title === "function") {
-        api.set_title({ title: backendText.desktopName });
-      }
+      api.set_title({ title: backendText.desktopName }).catch(() => {});
     }
   }, [selectedBackend]);
 
@@ -340,16 +351,20 @@ function RootLayoutContent() {
       conversationId?: string
     ): Promise<string> => {
       const convId = conversationId || Date.now().toString();
+      
+      // Ensure workingDirectory is not a literal dot, unless it really is the root
+      const wd = workingDirectory === "." || !workingDirectory ? undefined : workingDirectory;
+      
       createNewConversation(
         convId,
         title,
         initialMessages,
         false,
-        workingDirectory
+        wd
       );
       setActiveConversation(convId);
 
-      if (workingDirectory) {
+      if (wd) {
         // Start listening for progress before starting the session
         await startListeningForSession(convId);
         console.log(
@@ -442,13 +457,13 @@ function RootLayoutContent() {
               : selectedModel;
         console.log("🚀 [APP] Starting session", {
           sessionId: convId,
-          workingDirectory,
+          workingDirectory: wd,
           model: modelForBackend,
           backend: selectedBackend,
         });
         await api.start_session({
           sessionId: convId,
-          workingDirectory,
+          workingDirectory: wd,
           model: modelForBackend,
           backend: selectedBackend,
           backendConfig,
@@ -529,7 +544,10 @@ function RootLayoutContent() {
     const folderName = normalizedPath.split("/").filter(Boolean).pop() || workingDirectory;
     const title = `Chat in ${folderName}`;
     
-    await startNewConversation(title, workingDirectory);
+    // Convert "." to undefined so backend resolves absolute path
+    const wd = workingDirectory === "." ? undefined : workingDirectory;
+    
+    await startNewConversation(title, wd);
     
     // If we are not on the home page, navigate there
     if (location.pathname !== "/") {
@@ -615,7 +633,9 @@ function RootLayoutContent() {
               gridTemplateColumns:
                 activeRightPanel !== "none" &&
                 (activeConversation || isProjectDetailPage)
-                  ? `1fr ${directoryPanelWidth}px`
+                  ? isMobile
+                    ? "1fr"
+                    : `1fr ${directoryPanelWidth}px`
                   : "1fr",
             }}
           >
@@ -641,7 +661,7 @@ function RootLayoutContent() {
             </div>
 
             {/* Main content column */}
-            <div className="row-start-2 col-start-1 flex flex-col min-w-0 min-h-0">
+            <div className={`row-start-2 col-start-1 flex flex-col min-w-0 min-h-0 ${isMobile && activeRightPanel !== "none" ? "hidden" : ""}`}>
               <Outlet context={{ workingDirectory, setWorkingDirectory }} />
               {currentConversationWithStatus && isHomePage && (
                 <>
@@ -676,12 +696,14 @@ function RootLayoutContent() {
             {/* Right panel (Directory or Git) */}
             {activeRightPanel !== "none" &&
               (activeConversation || isProjectDetailPage) && (
-                <div className="row-start-2 col-start-2 min-h-0 relative">
-                  <SidebarResizeHandle
-                    onMouseDown={handleDirectoryPanelResizeStart}
-                    isResizing={isDirectoryPanelResizing}
-                    side="right"
-                  />
+                <div className={`row-start-2 ${isMobile ? 'col-start-1' : 'col-start-2'} min-h-0 relative`}>
+                  {!isMobile && (
+                    <SidebarResizeHandle
+                      onMouseDown={handleDirectoryPanelResizeStart}
+                      isResizing={isDirectoryPanelResizing}
+                      side="right"
+                    />
+                  )}
                   {activeRightPanel === "directory" && (
                     <DirectoryPanel
                       workingDirectory={workingDirectory}

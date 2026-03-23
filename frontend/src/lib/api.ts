@@ -219,6 +219,18 @@ export interface API {
   add_tag(params: { tag: string }): Promise<string[]>;
   delete_tag(params: { tag: string }): Promise<string[]>;
   toggle_project_tag(params: { projectId: string; tag: string }): Promise<{ tags: string[] }>;
+  get_qwen_settings(): Promise<any>;
+  update_qwen_settings(params: any): Promise<{ ok: boolean; error?: string }>;
+  get_ui_settings(): Promise<any>;
+  save_ui_settings(params: any): Promise<{ ok: boolean; error?: string }>;
+  open_qwen_settings_in_editor(): Promise<{ ok: boolean; error?: string }>;
+  open_qwen_folder(): Promise<{ ok: boolean; error?: string }>;
+  open_model_providers_json(): Promise<{ ok: boolean; error?: string }>;
+  get_model_providers(): Promise<{ providers: any[]; error?: string }>;
+  test_connection(params: { base_url: string; api_key: string; model: string }): Promise<{ ok: boolean; error?: string; data?: any }>;
+  get_home_directory(): Promise<string>;
+  is_home_directory(params: { path: string }): Promise<boolean>;
+  validate_directory(params: { path: string }): Promise<boolean>;
 }
 
 export type APICommand = keyof API;

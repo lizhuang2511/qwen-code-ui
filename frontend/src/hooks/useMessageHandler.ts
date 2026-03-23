@@ -82,7 +82,10 @@ export const useMessageHandler = ({
           }
 
           const existing = conversations.find((c) => c.id === convId);
-          const wd = existing?.workingDirectory || ".";
+          let wd = existing?.workingDirectory;
+          if (wd === "." || !wd) {
+            wd = undefined;
+          }
 
           await api.start_session({
             sessionId: convId,

@@ -69,26 +69,6 @@ export const webApi: API = {
     return response.data;
   },
 
-  async validate_directory(params) {
-    const response = await apiClient.post<boolean>(
-      "/validate-directory",
-      params
-    );
-    return response.data;
-  },
-
-  async is_home_directory(params) {
-    const response = await apiClient.post<boolean>(
-      "/is-home-directory",
-      params
-    );
-    return response.data;
-  },
-
-  async get_home_directory() {
-    const response = await apiClient.get<string>("/get-home-directory");
-    return response.data;
-  },
 
   async get_parent_directory(params) {
     const response = await apiClient.post<string | null>(
@@ -383,8 +363,73 @@ export const webApi: API = {
     return response.data;
   },
 
+  async get_home_directory() {
+    const response = await apiClient.get<string>("/get-home-directory");
+    // Some endpoints may return JSON like {"ok": true, "data": "..."} or just the string.
+    // If it's returning a plain string, response.data is that string.
+    if (typeof response.data === 'string') {
+       return response.data;
+    }
+    return (response.data as any).data || response.data;
+  },
+
+  async is_home_directory(params: { path: string }) {
+    const response = await apiClient.post<boolean>("/is-home-directory", params);
+    return response.data;
+  },
+
+  async validate_directory(params: { path: string }) {
+    const response = await apiClient.post<boolean>("/validate-directory", params);
+    return response.data;
+  },
+
   async toggle_project_tag(params: { projectId: string; tag: string }) {
     const response = await apiClient.post<{ tags: string[] }>("/project/toggle-tag", params);
+    return response.data;
+  },
+
+  async get_qwen_settings() {
+    const response = await apiClient.get<any>("/qwen-settings");
+    return response.data;
+  },
+
+  async update_qwen_settings(params: any) {
+    const response = await apiClient.post<{ ok: boolean; error?: string }>("/update-qwen-settings", params);
+    return response.data;
+  },
+
+  async get_ui_settings() {
+    const response = await apiClient.get<any>("/ui-settings");
+    return response.data;
+  },
+
+  async save_ui_settings(params: any) {
+    const response = await apiClient.post<{ ok: boolean; error?: string }>("/save-ui-settings", params);
+    return response.data;
+  },
+
+  async open_qwen_settings_in_editor() {
+    const response = await apiClient.post<{ ok: boolean; error?: string }>("/open-qwen-settings-in-editor");
+    return response.data;
+  },
+
+  async open_qwen_folder() {
+    const response = await apiClient.post<{ ok: boolean; error?: string }>("/open-qwen-folder");
+    return response.data;
+  },
+
+  async open_model_providers_json() {
+    const response = await apiClient.post<{ ok: boolean; error?: string }>("/open-model-providers-json");
+    return response.data;
+  },
+
+  async get_model_providers() {
+    const response = await apiClient.get<{ providers: any[]; error?: string }>("/model-providers");
+    return response.data;
+  },
+
+  async test_connection(params: { base_url: string; api_key: string; model: string }) {
+    const response = await apiClient.post<{ ok: boolean; error?: string; data?: any }>("/test-connection", params);
     return response.data;
   }
 };

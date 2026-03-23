@@ -127,9 +127,11 @@ export default function ProjectDetailPage() {
       const title = t("projects.newDiscussionTitle", {
         projectName: projectData.metadata.friendly_name,
       });
+      // Ensure path is not '.' if possible, though metadata.path shouldn't be '.'
+      const path = projectData.metadata.path === "." ? undefined : projectData.metadata.path;
       const conversationId = await startNewConversation(
         title,
-        projectData.metadata.path
+        path
       );
 
       // Start listening for session progress

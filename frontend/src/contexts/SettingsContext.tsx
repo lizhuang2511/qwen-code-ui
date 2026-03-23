@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { api } from "../lib/api";
 
 interface SettingsContextType {
   replyFontSize: number;
@@ -14,8 +15,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     setReplyFontSizeState(size);
     if (typeof window !== "undefined") {
       localStorage.setItem("reply-font-size", size.toString());
-      if (window.pywebview?.api?.save_ui_settings) {
-        await window.pywebview.api.save_ui_settings({ replyFontSize: size });
+      try {
+        await api.save_ui_settings({ replyFontSize: size });
+      } catch (e) {
+        console.warn("Failed to save ui settings", e);
       }
     }
   };
@@ -25,16 +28,15 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     const loadSettings = async () => {
       let size = 14;
       if (typeof window !== "undefined") {
-        // Try pywebview first, fallback to localStorage
-        if (window.pywebview?.api?.get_ui_settings) {
-           const uiSettings = await window.pywebview.api.get_ui_settings();
+        try {
+           const uiSettings = await api.get_ui_settings();
            if (uiSettings && uiSettings.replyFontSize) {
                size = uiSettings.replyFontSize;
            } else {
                const saved = localStorage.getItem("reply-font-size");
                if (saved) size = parseInt(saved, 10);
            }
-        } else {
+        } catch (e) {
            const saved = localStorage.getItem("reply-font-size");
            if (saved) size = parseInt(saved, 10);
         }
@@ -42,15 +44,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
     };
     
-    // Wait for pywebview to be ready if it's going to be available
-    if (window.pywebview) {
-        loadSettings();
-    } else {
-        window.addEventListener('pywebviewready', loadSettings);
-        // Fallback in case pywebview is not used
-        setTimeout(loadSettings, 500);
-        return () => window.removeEventListener('pywebviewready', loadSettings);
-    }
+    loadSettings();
   }, []);
 
   return (

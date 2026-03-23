@@ -18,6 +18,8 @@ import {
 } from "../types/backend";
 import { defaultBackendState } from "../utils/backendDefaults";
 
+import { api } from "../lib/api";
+
 const BackendContext = createContext<BackendContextValue | undefined>(
   undefined
 );
@@ -186,10 +188,9 @@ export const BackendProvider: React.FC<BackendProviderProps> = ({
   useEffect(() => {
     const syncWithQwenSettings = async () => {
       try {
-        if (window.pywebview?.api?.get_qwen_settings) {
-          const settings = await window.pywebview.api.get_qwen_settings();
-          if (settings) {
-            // Check auth type to determine if OAuth is used
+        const settings = await api.get_qwen_settings();
+        if (settings) {
+          // Check auth type to determine if OAuth is used
             const authType = settings.security?.auth?.selectedType;
             const useOAuth = authType === "qwen-oauth";
             const currentModelName = settings.model?.name;
@@ -234,7 +235,7 @@ export const BackendProvider: React.FC<BackendProviderProps> = ({
               }
             }
           }
-        }
+        
       } catch (error) {
         console.error("Failed to sync with Qwen settings:", error);
       }

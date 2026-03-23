@@ -50,10 +50,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   return (
     <div className="border-b border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex-shrink-0">
-      <div className="px-6 py-4">
+      <div className="px-3 sm:px-6 py-2 sm:py-4">
         <div className="flex items-center w-full">
           {/* Left section - Sidebar trigger + Desktop Logo */}
-          <div className="flex flex-1 items-center gap-3">
+          <div className="flex flex-1 items-center gap-1 sm:gap-3">
             <SidebarTrigger />
             <div
               className={`flex items-center gap-1 ${

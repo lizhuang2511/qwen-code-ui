@@ -8,6 +8,9 @@ from pathlib import Path
 from dotenv import load_dotenv, set_key
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.requests import Request
 from pydantic import BaseModel, Field
 
 # Add crates to path
@@ -32,6 +35,7 @@ from crates.session import get_process_statuses, start_session, send_message, ki
 import crates.events as events
 import crates.projects as projects
 import crates.backend.version_utils as version_utils
+from .api_web import router as api_web_router
 
 app = FastAPI()
 logger = logging.getLogger("app")
@@ -44,6 +48,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(api_web_router)
+
 
 class ConnectionManager:
     def __init__(self):
@@ -94,9 +101,7 @@ def event_bridge(event: str, payload: Any):
 # Register the bridge with the events system
 events.set_event_handler(event_bridge)
 
-@app.get("/api/get-home-directory")
-def api_get_home_directory() -> str:
-    return get_home_directory()
+# Removed duplicate @app.get("/api/get-home-directory") as it's better placed in api_web.py or handled consistently
 
 @app.get("/api/process-statuses")
 def api_process_statuses() -> List[Dict[str, Any]]:
@@ -177,26 +182,35 @@ async def websocket_endpoint(ws: WebSocket):
             # Receive and process messages
             data = await ws.receive_json()
             logger.debug(f"[ws] received command payload={data}")
-            command = data.get("command")
-            session_id = data.get("session_id")
-            logger.info(f"[ws] command={command} session_id={session_id}")
-            if command == "start-session":
-                start_session(
-                    session_id=session_id,
-                    working_directory=data.get("working_directory"),
-                    model=data.get("model"),
-                    backend=data.get("backend"),
-                    backend_config=data.get("backend_config")
-                )
-                
-            elif command == "send-message":
-                message = data.get("message")
-                if session_id and message:
-                    send_message(session_id, message)
             
-            elif command == "kill-process":
-                if session_id:
-                    kill_process(session_id)
+            # Allow passing array of commands or single command
+            if isinstance(data, list):
+                commands = data
+            else:
+                commands = [data]
+                
+            for cmd_data in commands:
+                command = cmd_data.get("command")
+                session_id = cmd_data.get("session_id")
+                logger.info(f"[ws] command={command} session_id={session_id}")
+                
+                if command == "start-session":
+                    start_session(
+                        session_id=session_id,
+                        working_directory=cmd_data.get("working_directory"),
+                        model=cmd_data.get("model"),
+                        backend=cmd_data.get("backend"),
+                        backend_config=cmd_data.get("backend_config")
+                    )
+                    
+                elif command == "send-message":
+                    message = cmd_data.get("message")
+                    if session_id and message:
+                        send_message(session_id, message)
+                
+                elif command == "kill-process":
+                    if session_id:
+                        kill_process(session_id)
                     
     except WebSocketDisconnect:
         manager.disconnect(ws)
@@ -371,4 +385,19 @@ def api_test_connection(req: TestConnectionRequest):
     except Exception as e:
         logger.error(f"Test connection error: {e}")
         return {"ok": False, "error": str(e)}
+
+# Mount frontend build as static files
+frontend_dist = BASE_DIR / "frontend" / "dist"
+if frontend_dist.exists():
+    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="static")
+
+@app.exception_handler(404)
+async def custom_404_handler(request: Request, exc: Exception):
+    # For SPA, return index.html for unknown routes if not an /api route
+    if not request.url.path.startswith("/api/") and frontend_dist.exists():
+        index_file = frontend_dist / "index.html"
+        if index_file.exists():
+            return FileResponse(str(index_file))
+    return JSONResponse(status_code=404, content={"message": "Not Found"})
+
 

@@ -378,6 +378,9 @@ def _process_queued_messages(session_id: str):
 
 def start_session(session_id: str, working_directory: Optional[str], model: Optional[str], backend: Optional[str] = None, backend_config: Optional[Dict] = None) -> None:
     wd = working_directory or "."
+    if wd == ".":
+        wd = os.path.abspath(wd)
+        
     mdl = model or ""
     
     # Resolve project ID
