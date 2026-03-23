@@ -23,6 +23,7 @@ interface AppSidebarProps {
   onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
   onOpenSearch?: () => void;
+  progresses?: Record<string, any>;
 }
 
 export function AppSidebar({
@@ -37,6 +38,7 @@ export function AppSidebar({
   onOpenChange,
   children,
   onOpenSearch,
+  progresses,
 }: AppSidebarProps) {
   const { t } = useTranslation();
   return (
@@ -45,6 +47,7 @@ export function AppSidebar({
       open={open}
       onOpenChange={onOpenChange}
       resizable={true}
+      progresses={progresses}
     >
       <Sidebar side="left" collapsible="offcanvas">
         <SidebarContent className="p-0">
@@ -57,6 +60,7 @@ export function AppSidebar({
             onModelChange={onModelChange}
             onRemoveConversation={onRemoveConversation}
             onOpenSearch={onOpenSearch}
+            progresses={progresses}
           />
         </SidebarContent>
         <SidebarFooter className="mt-auto p-2 border-t border-sidebar-border shrink-0">

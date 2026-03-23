@@ -23,16 +23,34 @@ import {
 interface PasteJsonDialogProps {
   trigger: React.ReactNode;
   onServersAdd: (servers: McpServerEntry[]) => void;
+  initialJson?: string;
+  isEditMode?: boolean;
 }
 
 export function PasteJsonDialog({
   trigger,
   onServersAdd,
+  initialJson,
+  isEditMode = false,
 }: PasteJsonDialogProps) {
   const [open, setOpen] = useState(false);
   const [jsonInput, setJsonInput] = useState("");
   const [parsedServers, setParsedServers] = useState<McpServerEntry[]>([]);
   const [error, setError] = useState<string>("");
+
+  const defaultJsonExample = `{
+  "mcpServers": {
+    "sqlite": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-sqlite",
+        "--db-path",
+        "~/test.db"
+      ],
+      "env": {}
+    }
+  }
+}`;
 
   // Parse JSON input and update preview
   const parseJson = (input: string) => {
@@ -97,6 +115,15 @@ export function PasteJsonDialog({
       setJsonInput("");
       setParsedServers([]);
       setError("");
+    } else {
+      if (initialJson) {
+        setJsonInput(initialJson);
+        parseJson(initialJson);
+      } else if (!jsonInput) {
+        // Set default example when opening if empty and no initialJson
+        setJsonInput(defaultJsonExample);
+        parseJson(defaultJsonExample);
+      }
     }
   };
 
@@ -157,7 +184,7 @@ export function PasteJsonDialog({
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Paste JSON</DialogTitle>
+          <DialogTitle>{isEditMode ? "Edit JSON Configuration" : "Paste JSON"}</DialogTitle>
         </DialogHeader>
 
         <div className="flex-1 space-y-6 overflow-y-auto p-4">
@@ -243,7 +270,7 @@ export function PasteJsonDialog({
             disabled={parsedServers.length === 0 || !!error}
             className="px-8"
           >
-            Create
+            {isEditMode ? "Save" : "Create"}
           </Button>
         </div>
       </DialogContent>

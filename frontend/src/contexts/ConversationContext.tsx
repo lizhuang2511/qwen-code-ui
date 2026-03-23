@@ -38,6 +38,7 @@ export interface ConversationContextType {
   confirmationRequests: Map<string, ToolCallConfirmationRequest>;
   removeConversation: (conversationId: string) => void;
   progress: SessionProgressPayload | null;
+  progresses: Record<string, SessionProgressPayload>;
 }
 
 export const ConversationContext = createContext<

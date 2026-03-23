@@ -506,7 +506,17 @@ export class WebSocketManager {
 
     // Use current host for WebSocket connection
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/api/ws`;
+    
+    // In pywebview or production mode, use the specific port where the backend is running
+    // In dev mode (vite), use the proxy on the same port
+    const isDev = import.meta.env.DEV;
+    let wsUrl = `${protocol}//${window.location.host}/api/ws`;
+    
+    // Check if we're running inside pywebview (where host is something like 127.0.0.1:something)
+    // The FastAPI backend always runs on port 1858
+    if (!isDev && window.location.hostname === '127.0.0.1' && window.location.port !== '1858') {
+      wsUrl = `${protocol}//127.0.0.1:1858/api/ws`;
+    }
 
     console.log("🔌 Connecting to WebSocket:", wsUrl);
 

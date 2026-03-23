@@ -2,14 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
-import { FileText, Package, Trash2, ArrowLeft, Play } from "lucide-react";
+import { FileText, Trash2, ArrowLeft, Play } from "lucide-react";
 import {
   McpServerEntry,
   isStdioConfig,
   isSSEConfig,
   isHTTPConfig,
 } from "../types";
-import { AddMcpServerDialog } from "../components/mcp/AddMcpServerDialog";
 import { PasteJsonDialog } from "../components/mcp/PasteJsonDialog";
 import { ModelContextProtocol } from "../components/common/ModelContextProtocol";
 import {
@@ -27,7 +26,7 @@ import { useTranslation } from "react-i18next";
 
 import { Switch } from "../components/ui/switch";
 import { api } from "../lib/api";
-import { AlertCircle, CheckCircle2, RefreshCw, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, RefreshCw, Loader2, PowerOff, Edit } from "lucide-react";
 
 export function McpServersPage() {
   const { t } = useTranslation();
@@ -153,9 +152,10 @@ export function McpServersPage() {
     }
   };
 
-  const handleAddServer = (server: McpServerEntry) => {
-    const updatedServers = [...servers, server];
+  const handleDisableAllServers = () => {
+    const updatedServers = servers.map((s) => ({ ...s, enabled: false }));
     saveServersToFile(updatedServers);
+    setServerStatuses({});
   };
 
   const handleAddServers = (newServers: McpServerEntry[]) => {
@@ -289,6 +289,14 @@ export function McpServersPage() {
             {servers.length > 0 && (
               <div className="flex gap-3">
                 <Button
+                  variant="outline"
+                  className="flex items-center gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200"
+                  onClick={handleDisableAllServers}
+                >
+                  <PowerOff className="h-4 w-4" />
+                  关闭所有 MCP
+                </Button>
+                <Button
                   variant="secondary"
                   className="flex items-center gap-2"
                   onClick={handleLaunchQwenTest}
@@ -296,20 +304,11 @@ export function McpServersPage() {
                   <Play className="h-4 w-4" />
                   启动 qwen 安测
                 </Button>
-                <AddMcpServerDialog
-                  trigger={
-                    <Button className="flex items-center gap-2">
-                      <Package className="h-4 w-4" />
-                      {t("mcp.addNewServer")}
-                    </Button>
-                  }
-                  onServerAdd={handleAddServer}
-                />
                 <PasteJsonDialog
                   trigger={
                     <Button variant="outline" className="flex items-center gap-2">
                       <FileText className="h-4 w-4" />
-                      {t("mcp.pasteJson")}
+                      添加 MCP 服务
                     </Button>
                   }
                   onServersAdd={handleAddServers}
@@ -338,6 +337,14 @@ export function McpServersPage() {
               </p>
               <div className="flex gap-3">
                 <Button
+                  variant="outline"
+                  className="flex items-center gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200"
+                  onClick={handleDisableAllServers}
+                >
+                  <PowerOff className="h-4 w-4" />
+                  关闭所有 MCP
+                </Button>
+                <Button
                   variant="secondary"
                   className="flex items-center gap-2"
                   onClick={handleLaunchQwenTest}
@@ -345,15 +352,6 @@ export function McpServersPage() {
                   <Play className="h-4 w-4" />
                   启动 qwen 安测
                 </Button>
-                <AddMcpServerDialog
-                  trigger={
-                    <Button className="flex items-center gap-2">
-                      <Package className="h-4 w-4" />
-                      {t("mcp.addFirstServer")}
-                    </Button>
-                  }
-                  onServerAdd={handleAddServer}
-                />
                 <PasteJsonDialog
                   trigger={
                     <Button
@@ -361,7 +359,7 @@ export function McpServersPage() {
                       className="flex items-center gap-2"
                     >
                       <FileText className="h-4 w-4" />
-                      {t("mcp.importFromJson")}
+                      添加 MCP 服务
                     </Button>
                   }
                   onServersAdd={handleAddServers}
@@ -410,6 +408,44 @@ export function McpServersPage() {
                                 )}
                             </div>
                           )}
+
+                          {/* Edit Server Button (JSON Editor) */}
+                          <PasteJsonDialog
+                            trigger={
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Edit Server Configuration"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            }
+                            initialJson={JSON.stringify({ mcpServers: { [server.name]: server.config } }, null, 2)}
+                            isEditMode={true}
+                            onServersAdd={(updatedServers) => {
+                              if (updatedServers.length > 0) {
+                                // Find the server being edited
+                                const updatedServerConfig = updatedServers[0];
+                                
+                                // Maintain the original ID and enabled status, update name and config
+                                const serverToSave = {
+                                  ...server,
+                                  name: updatedServerConfig.name,
+                                  config: updatedServerConfig.config
+                                };
+                                
+                                const newServersList = servers.map(s => 
+                                  s.id === server.id ? serverToSave : s
+                                );
+                                saveServersToFile(newServersList);
+                                
+                                // Check status immediately after editing if it's enabled
+                                if (serverToSave.enabled) {
+                                  checkServerStatus(serverToSave);
+                                }
+                              }
+                            }}
+                          />
 
                           <div className="flex items-center gap-2 mr-2">
                             <Switch

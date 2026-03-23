@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
-import { cva, VariantProps } from "class-variance-authority";
+import { cva, type VariantProps } from "class-variance-authority";
 import { PanelLeftIcon, GripVertical } from "lucide-react";
 
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -72,6 +72,8 @@ function SidebarProvider({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   resizable?: boolean;
+  onOpenSearch?: () => void;
+  progresses?: Record<string, any>;
 }) {
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);

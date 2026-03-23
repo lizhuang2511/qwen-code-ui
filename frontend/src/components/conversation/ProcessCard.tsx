@@ -49,7 +49,6 @@ export function ProcessCard({
   formatLastUpdated,
   onRemoveConversation,
   progress,
-  activeConversation,
 }: ProcessCardProps) {
   const { t } = useTranslation();
 
@@ -170,6 +169,7 @@ export function ProcessCard({
             variant="destructive"
             onClick={() => {
               onKillProcess(conversation.id);
+              onRemoveConversation(conversation.id);
               setSelectedConversationForEnd(null);
             }}
           >
@@ -347,6 +347,7 @@ export function ProcessCard({
                                 variant="destructive"
                                 onClick={() => {
                                   onKillProcess(conversation.id);
+                                  onRemoveConversation(conversation.id);
                                   setSelectedConversationForEnd(null);
                                 }}
                               >
@@ -389,7 +390,6 @@ export function ProcessCard({
         </div>
 
         {progress &&
-          activeConversation === conversation.id &&
           progress.stage !== SessionProgressStage.Ready && (
             <div className="px-4 pb-3">
               <hr className="border-gray-200 dark:border-gray-700 mb-3" />

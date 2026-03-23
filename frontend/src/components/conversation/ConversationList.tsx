@@ -20,6 +20,7 @@ interface ConversationListProps {
   onModelChange?: (model: string) => void; // kept for compatibility
   onRemoveConversation: (id: string) => void;
   onOpenSearch?: () => void;
+  progresses?: Record<string, any>;
 }
 
 export function ConversationList({
@@ -30,6 +31,7 @@ export function ConversationList({
   onKillProcess,
   onRemoveConversation,
   onOpenSearch,
+  progresses,
 }: ConversationListProps) {
   const { t } = useTranslation();
   const { selectedBackend } = useBackend();
@@ -40,7 +42,7 @@ export function ConversationList({
     title: string;
   } | null>(null);
 
-  const { progress, confirmationRequests } = useConversation();
+  const { confirmationRequests } = useConversation();
 
   // Search moved to global AppHeader trigger
 
@@ -195,7 +197,7 @@ export function ConversationList({
                   setSelectedConversationForEnd={setSelectedConversationForEnd}
                   formatLastUpdated={formatLastUpdated}
                   onRemoveConversation={onRemoveConversation}
-                  progress={progress}
+                  progress={progresses?.[conversation.id] || null}
                   activeConversation={activeConversation}
                 />
               );

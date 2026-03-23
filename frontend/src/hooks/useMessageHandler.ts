@@ -94,13 +94,20 @@ export const useMessageHandler = ({
           
           conversationModes.current[convId] = value;
           
+          // Seed progress so the UI shows starting indicator immediately
+          const event = new CustomEvent('seed-progress', { detail: { sessionId: convId } });
+          window.dispatchEvent(event);
+          
           updateConversation(convId, (conv) => {
-            conv.messages.push({
-              id: Date.now().toString(),
-              parts: [{ type: "text", text: `🔄 **System:** Session restarted in **${value}** mode.` }],
-              sender: "assistant",
-              timestamp: new Date(),
-            });
+            // Only add system message if it's the active conversation
+            if (conv.id === convId) {
+              conv.messages.push({
+                id: Date.now().toString(),
+                parts: [{ type: "text", text: `🔄 **System:** Session restarted in **${value}** mode.` }],
+                sender: "assistant",
+                timestamp: new Date(),
+              });
+            }
           });
 
         } catch (error) {

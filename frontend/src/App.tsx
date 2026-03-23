@@ -50,7 +50,7 @@ import { SettingsDialog } from "./components/common/SettingsDialog";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
 
 function RootLayoutContent() {
-  const { progress, startListeningForSession, seedProgress } =
+  const { progresses, startListeningForSession, seedProgress } =
     useSessionProgress();
 
   const {
@@ -100,7 +100,19 @@ function RootLayoutContent() {
       }
     }
   }, [backendState.selectedBackend, backendState.configs, selectedModel]);
-  const [cliIOLogs, setCliIOLogs] = useState<CliIO[]>([]);
+
+  const isCliInstalled = useCliInstallation(selectedBackend);
+
+  const {
+    conversations,
+    activeConversation,
+    setActiveConversation,
+    updateConversation,
+    createNewConversation,
+    loadConversationFromHistory,
+    removeConversation,
+  } = useConversationManager();
+
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
@@ -150,18 +162,37 @@ function RootLayoutContent() {
     }
   }, [selectedBackend]);
 
-  // Custom hooks for cleaner code
-  const isCliInstalled = useCliInstallation(selectedBackend);
+  // Always listen for progress on the active conversation
+  useEffect(() => {
+    if (activeConversation) {
+      startListeningForSession(activeConversation).catch((err) =>
+        console.error("Failed to start listening for session progress:", err)
+      );
+    }
+  }, [activeConversation, startListeningForSession]);
+  // Listen for seed progress events from other components (like MessageInputBar mode changes)
+  useEffect(() => {
+    const handleSeedProgress = (e: Event) => {
+      const customEvent = e as CustomEvent<{ sessionId: string }>;
+      const { sessionId } = customEvent.detail;
+      if (sessionId) {
+        try {
+          const backendName = getBackendText(selectedBackend).name;
+          // Seed the progress for this specific session ID
+          seedProgress(sessionId, { message: `Starting ${backendName} session initialization` });
+        } catch (err) {
+          console.warn("⚠️ [APP] Failed to seed progress on event", err);
+        }
+      }
+    };
 
-  const {
-    conversations,
-    activeConversation,
-    setActiveConversation,
-    updateConversation,
-    createNewConversation,
-    loadConversationFromHistory,
-    removeConversation,
-  } = useConversationManager();
+    window.addEventListener('seed-progress', handleSeedProgress);
+    return () => {
+      window.removeEventListener('seed-progress', handleSeedProgress);
+    };
+  }, [selectedBackend, seedProgress]);
+
+  const [cliIOLogs, setCliIOLogs] = useState<CliIO[]>([]);
 
   const { processStatuses, fetchProcessStatuses, handleKillProcess } =
     useProcessManager();
@@ -326,9 +357,6 @@ function RootLayoutContent() {
           convId
         );
 
-        console.log("Debug - apiConfig:", apiConfig);
-        console.log("Debug - selectedBackend:", selectedBackend);
-
         let backendConfig;
         let geminiAuth;
 
@@ -372,13 +400,7 @@ function RootLayoutContent() {
         // Optimistically seed initial progress so the UI shows immediately
         try {
           const backendName = getBackendText(selectedBackend).name;
-          seedProgress({
-            message: `Starting ${backendName} session initialization`,
-            progress_percent: 5,
-            details: workingDirectory
-              ? `Working directory: ${workingDirectory}`
-              : undefined,
-          });
+          seedProgress(convId, { message: `Starting ${backendName} session initialization` });
         } catch (e) {
           console.warn("⚠️ [APP] Failed to seed initial progress", e);
         }
@@ -546,7 +568,8 @@ function RootLayoutContent() {
       handleConfirmToolCall,
       confirmationRequests,
       removeConversation,
-      progress,
+      progress: activeConversation ? progresses[activeConversation] : null,
+      progresses,
     }),
     [
       conversations,
@@ -564,7 +587,7 @@ function RootLayoutContent() {
       handleConfirmToolCall,
       confirmationRequests,
       removeConversation,
-      progress,
+      progresses,
     ]
   );
 
@@ -581,6 +604,7 @@ function RootLayoutContent() {
         open={sidebarOpen}
         onOpenChange={setSidebarOpen}
         onOpenSearch={() => setSearchOpen(true)}
+        progresses={progresses}
       >
         <SidebarInset>
           {/* Grid layout: header spans all columns; content + optional right panel */}

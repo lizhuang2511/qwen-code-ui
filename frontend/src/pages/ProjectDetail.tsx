@@ -42,7 +42,7 @@ export default function ProjectDetailPage() {
   const { setWorkingDirectory } = useOutletContext<{
     setWorkingDirectory: (path: string) => void;
   }>();
-  const { startNewConversation, loadConversationFromHistory, setActiveConversation } =
+  const { activeConversation, startNewConversation, loadConversationFromHistory, setActiveConversation } =
     useConversation();
   const { selectedBackend } = useBackend();
   const backendText = getBackendText(selectedBackend);
@@ -57,7 +57,8 @@ export default function ProjectDetailPage() {
   const [loadingDiscussionId, setLoadingDiscussionId] = React.useState<
     string | null
   >(null);
-  const { progress, startListeningForSession } = useSessionProgress();
+  const { progresses, startListeningForSession } = useSessionProgress();
+  const progress = activeConversation ? progresses[activeConversation] : null;
 
   // Debug logging
   React.useEffect(() => {

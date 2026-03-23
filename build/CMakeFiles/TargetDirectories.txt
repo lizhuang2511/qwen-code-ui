@@ -1,3 +1,0 @@
-D:/giteecode/qwencode5/build/CMakeFiles/PyStand.dir
-D:/giteecode/qwencode5/build/CMakeFiles/ALL_BUILD.dir
-D:/giteecode/qwencode5/build/CMakeFiles/ZERO_CHECK.dir

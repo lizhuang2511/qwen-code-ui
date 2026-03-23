@@ -19,6 +19,9 @@ import {
   defaultStdioConfig,
   defaultSSEConfig,
   defaultHTTPConfig,
+  isStdioConfig,
+  isSSEConfig,
+  isHTTPConfig,
 } from "../../types";
 import { DynamicList, DynamicKeyValueList } from "./DynamicList";
 import { useBackend } from "../../contexts/BackendContext";
@@ -28,6 +31,7 @@ import { useTranslation } from "react-i18next";
 interface AddMcpServerDialogProps {
   trigger: React.ReactNode;
   onServerAdd: (server: McpServerEntry) => void;
+  initialServer?: McpServerEntry;
 }
 
 interface KeyValuePair {
@@ -38,6 +42,7 @@ interface KeyValuePair {
 export function AddMcpServerDialog({
   trigger,
   onServerAdd,
+  initialServer,
 }: AddMcpServerDialogProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -85,8 +90,52 @@ export function AddMcpServerDialog({
   useEffect(() => {
     if (!open) {
       resetForm();
+    } else if (initialServer) {
+      // Populate form with initial server data
+      setServerName(initialServer.id);
+      const config = initialServer.config;
+      
+      if (isStdioConfig(config)) {
+        setTransportType("stdio");
+        setCommand(config.command || "");
+        setArgs(config.args || []);
+        setWorkingDirectory(config.cwd || "");
+      } else if (isSSEConfig(config)) {
+        setTransportType("sse");
+        setUrl(config.url || "");
+      } else if (isHTTPConfig(config)) {
+        setTransportType("http");
+        setHttpUrl(config.httpUrl || "");
+      }
+
+      setTimeout(config.timeout || 300000);
+      setTrust(config.trust || false);
+
+      if (config.env) {
+        setEnvironment(Object.entries(config.env).map(([key, value]) => ({ key, value: String(value) })));
+      }
+      
+      if (config.headers) {
+        setHeaders(Object.entries(config.headers).map(([key, value]) => ({ key, value: String(value) })));
+      }
+
+      setIncludeTools(config.includeTools || []);
+      setExcludeTools(config.excludeTools || []);
+
+      if (config.oauth) {
+        setRequiresAuthentication(true);
+        setSupportsOAuthDiscovery(config.oauth.supportsDiscovery || false);
+        setClientId(config.oauth.clientId || "");
+        setClientSecret(config.oauth.clientSecret || "");
+        setAuthorizationUrl(config.oauth.authorizationUrl || "");
+        setTokenUrl(config.oauth.tokenUrl || "");
+        setScopes(config.oauth.scopes || []);
+        setRedirectUri(config.oauth.redirectUri || "http://localhost:7777/oauth/callback");
+        setTokenParameterName(config.oauth.tokenParamName || "");
+        setAudiences(config.oauth.audiences || []);
+      }
     }
-  }, [open]);
+  }, [open, initialServer]);
 
   // Set initial server name when dialog opens
   useEffect(() => {
@@ -200,10 +249,10 @@ export function AddMcpServerDialog({
     }
 
     const newServer: McpServerEntry = {
-      id: `server-${Date.now()}`,
+      id: initialServer ? initialServer.id : serverName || `${transportType}_server`,
       name: serverName || `${transportType}_server`,
       config: baseConfig,
-      enabled: true,
+      enabled: initialServer ? initialServer.enabled : true,
     };
 
     onServerAdd(newServer);
@@ -218,7 +267,7 @@ export function AddMcpServerDialog({
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
-            {t("mcp.addNewMcpServer")}
+            {initialServer ? "Edit MCP Server" : t("mcp.addNewMcpServer")}
             <Button
               variant="ghost"
               size="icon"
@@ -565,7 +614,7 @@ export function AddMcpServerDialog({
         {/* Footer with Create button */}
         <div className="flex-shrink-0 flex justify-end pt-4 border-t">
           <Button onClick={handleCreate} className="px-8">
-            {t("common.create")}
+            {initialServer ? "Save" : t("common.create")}
           </Button>
         </div>
       </DialogContent>
