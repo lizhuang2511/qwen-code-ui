@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { api } from "../lib/api";
-import { Message, Conversation } from "../types";
+import { Message, Conversation, UserMessagePart } from "../types";
 import { useBackend } from "../contexts/BackendContext";
 
 interface UseMessageHandlerProps {
@@ -44,6 +44,16 @@ export const useMessageHandler = ({
   // Get current values based on active conversation or defaults
   const currentInput = activeConversation ? (inputState[activeConversation] || "") : (inputState["new"] || "");
   const currentApprovalMode = activeConversation ? (approvalModeState[activeConversation] || "default") : (approvalModeState["new"] || "default");
+
+  const [imagesState, setImagesState] = useState<Record<string, { mimeType: string; data: string; name?: string }[]>>({});
+  const currentImages = activeConversation ? (imagesState[activeConversation] || []) : (imagesState["new"] || []);
+
+  const setImages = useCallback((value: { mimeType: string; data: string; name?: string }[]) => {
+    setImagesState(prev => ({
+      ...prev,
+      [activeConversation || "new"]: value
+    }));
+  }, [activeConversation]);
 
   const setInput = useCallback((value: string) => {
     setInputState(prev => ({
@@ -148,7 +158,10 @@ export const useMessageHandler = ({
       if (userMessageCount === 3) {
         const userMessages = messages
           .filter((msg) => msg.sender === "user")
-          .map((msg) => msg.parts[0].text)
+          .map((msg) => {
+            const textPart = msg.parts.find(p => p.type === "text");
+            return textPart && textPart.type === "text" ? textPart.text : "[Attachment]";
+          })
           .join(" | ");
 
         try {
@@ -171,18 +184,38 @@ export const useMessageHandler = ({
     async (e: React.FormEvent) => {
       e.preventDefault();
 
-      if (!currentInput.trim() || !isCliInstalled) {
+      if ((!currentInput.trim() && currentImages.length === 0) || !isCliInstalled) {
         return;
       }
 
+      const parts: UserMessagePart[] = [];
+      if (currentInput.trim()) {
+        parts.push({
+          type: "text",
+          text: currentInput,
+        });
+      }
+      
+      currentImages.forEach(img => {
+        if (img.mimeType.startsWith('image/')) {
+          parts.push({
+            type: "image",
+            mimeType: img.mimeType,
+            data: img.data,
+          });
+        } else {
+          parts.push({
+            type: "file",
+            mimeType: img.mimeType,
+            data: img.data,
+            name: img.name || "file",
+          });
+        }
+      });
+
       const newMessage: Message = {
         id: Date.now().toString(),
-        parts: [
-          {
-            type: "text",
-            text: currentInput,
-          },
-        ],
+        parts: parts,
         sender: "user",
         timestamp: new Date(),
       };
@@ -194,6 +227,7 @@ export const useMessageHandler = ({
         updateConversation(activeConversation, (conv) => {
           conv.messages.push(newMessage);
           conv.isStreaming = true; // Start streaming indicator when sending message
+          conv.isNew = false; // Mark as not new once a message is sent
         });
 
         // Check if this is the 3rd user message and generate title
@@ -215,8 +249,10 @@ export const useMessageHandler = ({
       }
 
       const messageText = currentInput;
+      const messageImages = [...currentImages];
 
       setInput("");
+      setImages([]);
 
       // Check if user is trying to use the disabled model.
       if (selectedModel === "gemini-2.5-flash-lite") {
@@ -331,6 +367,7 @@ export const useMessageHandler = ({
         await api.send_message({
           sessionId: convId, // Tauri auto-converts to session_id
           message: messageText,
+          images: messageImages.length > 0 ? messageImages : undefined,
           conversationHistory: "", // Tauri auto-converts to conversation_history
           model: selectedModel,
           backendConfig: backendConfig, // Tauri auto-converts to backend_config
@@ -376,6 +413,8 @@ export const useMessageHandler = ({
   return {
     input: currentInput,
     setInput,
+    images: currentImages,
+    setImages,
     handleInputChange,
     handleSendMessage,
     approvalMode: currentApprovalMode,

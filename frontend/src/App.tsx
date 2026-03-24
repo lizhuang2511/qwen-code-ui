@@ -48,6 +48,7 @@ import "./index.css";
 import { getPlatform } from "./lib/runtime";
 import { isPywebview } from "./lib/runtime";
 import { SettingsDialog } from "./components/common/SettingsDialog";
+import { WebSettingsDialog } from "./components/common/WebSettingsDialog";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
 
 function RootLayoutContent() {
@@ -124,6 +125,7 @@ function RootLayoutContent() {
   
   const [searchOpen, setSearchOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isWebSettingsOpen, setIsWebSettingsOpen] = useState(false);
   const [workingDirectory, setWorkingDirectory] = useState<string>(".");
   const [isContinuingConversation, setIsContinuingConversation] =
     useState(false);
@@ -245,7 +247,7 @@ function RootLayoutContent() {
     updateConversation
   );
 
-  const { input, handleInputChange, handleSendMessage, approvalMode, setApprovalMode } = useMessageHandler({
+  const { input, images, setImages, handleInputChange, handleSendMessage, approvalMode, setApprovalMode } = useMessageHandler({
     activeConversation,
     conversations: conversationsWithStatus,
     selectedModel,
@@ -267,17 +269,27 @@ function RootLayoutContent() {
   // Open Settings dialog when a global event is dispatched
   useEffect(() => {
     const handler = () => setIsSettingsOpen(true);
+    const webHandler = () => setIsWebSettingsOpen(true);
     // Type guard for addEventListener/removeEventListener signature without using any
     type WindowEventHandler = (this: Window, ev: Event) => unknown;
     window.addEventListener(
       "app:open-settings",
       handler as unknown as WindowEventHandler
     );
-    return () =>
+    window.addEventListener(
+      "app:open-web-settings",
+      webHandler as unknown as WindowEventHandler
+    );
+    return () => {
       window.removeEventListener(
         "app:open-settings",
         handler as unknown as WindowEventHandler
       );
+      window.removeEventListener(
+        "app:open-web-settings",
+        webHandler as unknown as WindowEventHandler
+      );
+    };
   }, []);
 
   // Open Search dialog when a global event is dispatched
@@ -672,6 +684,8 @@ function RootLayoutContent() {
                   <MessageInputBar
                     ref={messageInputBarRef}
                     input={input}
+                    images={images}
+                    setImages={setImages}
                     isCliInstalled={isCliInstalled}
                     cliIOLogs={cliIOLogs}
                     handleInputChange={handleInputChange}
@@ -684,7 +698,7 @@ function RootLayoutContent() {
                       handleContinueConversation(currentConversationWithStatus)
                     }
                     isContinuingConversation={isContinuingConversation}
-                    isNew={currentConversationWithStatus.isNew}
+                    isNew={currentConversationWithStatus.isNew && currentConversationWithStatus.messages.length === 0}
                     isStreaming={currentConversationWithStatus.isStreaming}
                     approvalMode={approvalMode}
                     setApprovalMode={setApprovalMode}
@@ -737,6 +751,11 @@ function RootLayoutContent() {
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}
         onModelChange={handleModelChange}
+      />
+      {/* Web Settings Dialog */}
+      <WebSettingsDialog
+        open={isWebSettingsOpen}
+        onOpenChange={setIsWebSettingsOpen}
       />
     </ConversationContext.Provider>
   );

@@ -75,6 +75,7 @@ export interface API {
   send_message(params: {
     sessionId: string;
     message: string;
+    images?: { mimeType: string; data: string }[];
     conversationHistory: string;
     model?: string;
     backendConfig?: {
@@ -198,6 +199,16 @@ export interface API {
     is_binary: boolean;
     error: string | null;
   }>;
+  write_binary_file_content(params: { path: string; content: string }): Promise<{
+    path: string;
+    content: string | null;
+    size: number;
+    modified: number | null;
+    encoding: string;
+    is_text: boolean;
+    is_binary: boolean;
+    error: string | null;
+  }>;
   open_with_default_app(params: { path: string }): Promise<void>;
   copy_files(params: { paths: string[]; target: string }): Promise<string[]>;
   create_directory(params: { path: string }): Promise<boolean>;
@@ -208,8 +219,9 @@ export interface API {
     content: string[] | string;
   }): Promise<boolean>;
   get_clipboard_content(): Promise<{
-    type: "files" | "text" | "empty";
+    type: "files" | "text" | "image" | "empty";
     content: string[] | string | null;
+    format?: string;
   }>;
   get_mcp_config(): Promise<any>;
   save_mcp_config(params: any): Promise<boolean>;
@@ -231,6 +243,7 @@ export interface API {
   get_home_directory(): Promise<string>;
   is_home_directory(params: { path: string }): Promise<boolean>;
   validate_directory(params: { path: string }): Promise<boolean>;
+  get_local_ip(): Promise<{ip: string}>;
 }
 
 export type APICommand = keyof API;

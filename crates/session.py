@@ -119,8 +119,11 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
     def read_stdout():
         total = 0
         log_buffer = []
+        thought_log_buffer = []
         ui_buffer = []
+        thought_buffer = []
         last_emit_time = 0
+        last_thought_emit_time = 0
 
         def flush_ui_buffer():
             nonlocal ui_buffer, last_emit_time
@@ -130,6 +133,17 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
             events.emit(f"ai-output-{session_id}", full_text)
             ui_buffer.clear()
             last_emit_time = time.time()
+            # print(f"Flushed UI buffer: {len(full_text)} chars")
+
+        def flush_thought_buffer():
+            nonlocal thought_buffer, last_thought_emit_time
+            if not thought_buffer:
+                return
+            full_text = "".join(thought_buffer)
+            events.emit(f"ai-thought-{session_id}", full_text)
+            thought_buffer.clear()
+            last_thought_emit_time = time.time()
+            # print(f"Flushed thought buffer: {len(full_text)} chars")
 
         def flush_log_buffer():
             nonlocal log_buffer
@@ -146,17 +160,33 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                 }
                 logger.log(payload)
 
+        def flush_thought_log_buffer():
+            nonlocal thought_log_buffer
+            if not thought_log_buffer:
+                return
+            full_text = "".join(thought_log_buffer)
+            thought_log_buffer.clear()
+            logger = _get_logger(session_id)
+            if logger:
+                payload = {
+                    "method": "session/update",
+                    "params": {"update": {"sessionUpdate": "agent_thought_chunk", "content": {"type": "text", "text": full_text}}},
+                    "timestamp": datetime.utcnow().isoformat() + "Z"
+                }
+                logger.log(payload)
+
         def line_generator():
             if isinstance(proc, QwenProcess):
                 while True:
                     try:
                         # QwenProcess.stdout_queue stores decoded strings or None
-                        line = proc.stdout_queue.get(timeout=0.05)
+                        line = proc.stdout_queue.get(timeout=0.01) # Faster poll
                         if line is None:
                             return
                         yield line
                     except queue.Empty:
                         flush_ui_buffer()
+                        flush_thought_buffer()
             else:
                 for line in proc.stdout:
                     yield line
@@ -177,7 +207,9 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                     # print(f"[SESSION-PARSE] status={status}") # Debug parsed status
                     if status == "permission_request":
                         flush_ui_buffer()
+                        flush_thought_buffer()
                         flush_log_buffer()
+                        flush_thought_log_buffer()
                         data = parsed.get("content")
                         raw_data = parsed.get("raw", "")
                         events.emit(f"cli-io-{session_id}", {"type": "output", "data": raw_data})
@@ -208,8 +240,30 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                         events.emit(f"acp-permission-request-{session_id}", payload)
                         continue
 
+                    if status == "tool_call":
+                        flush_ui_buffer()
+                        flush_thought_buffer()
+                        data = parsed.get("content") or {}
+                        params = data.get("params") or {}
+                        update = params.get("update") or {}
+                        
+                        print(f"[SESSION] Processing tool_call: id={update.get('toolCallId')}")
+                        events.emit(f"acp-session-update-{session_id}", update)
+                        
+                        # Log tool call
+                        logger = _get_logger(session_id)
+                        if logger:
+                            payload = {
+                                "method": "session/update",
+                                "params": {"update": update},
+                                "timestamp": datetime.utcnow().isoformat() + "Z"
+                            }
+                            logger.log(payload)
+                        continue
+
                     if status == "tool_call_update":
                         flush_ui_buffer()
+                        flush_thought_buffer()
                         data = parsed.get("content") or {}
                         params = data.get("params") or {}
                         update = params.get("update") or {}
@@ -227,28 +281,14 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                                 
                         # Forward event to frontend to ensure UI updates
                         print(f"[SESSION] 后端: 已发送工具调用更新到前端: toolCallId={tool_call_id} status={tool_status}")
-                        events.emit(f"acp-session-update-{session_id}", {
-                            "sessionUpdate": "tool_call_update",
-                            "toolCallId": tool_call_id,
-                            "status": tool_status,
-                            "result": update.get("result")
-                        })
+                        events.emit(f"acp-session-update-{session_id}", update)
                         
                         # Log tool call update
                         logger = _get_logger(session_id)
                         if logger:
                             payload = {
                                 "method": "session/update",
-                                "params": {
-                                    "update": {
-                                        "sessionUpdate": "tool_call_update",
-                                        "toolCallId": tool_call_id,
-                                        "status": tool_status,
-                                        "content": update.get("content") or [],
-                                        "serverName": update.get("serverName") or "local",
-                                        "toolName": update.get("toolName") or "unknown"
-                                    }
-                                },
+                                "params": {"update": update},
                                 "timestamp": datetime.utcnow().isoformat() + "Z"
                             }
                             logger.log(payload)
@@ -263,9 +303,26 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                              events.emit(f"ai-turn-finished-{session_id}", {})
                         continue
 
+                    if status == "response":
+                        flush_ui_buffer()
+                        flush_thought_buffer()
+                        flush_log_buffer()
+                        flush_thought_log_buffer()
+                        # Some models/adapters send a response object at the end of the turn without explicit stopReason
+                        print(f"[SESSION] Turn finished via response object")
+                        events.emit(f"ai-turn-finished-{session_id}", {"status": "success"})
+                        
+                        # Log turn finished
+                        logger = _get_logger(session_id)
+                        if logger:
+                            logger.log(parsed.get("content") or {})
+                        continue
+
                     if status == "turn_finished":
                         flush_ui_buffer()
+                        flush_thought_buffer()
                         flush_log_buffer()
+                        flush_thought_log_buffer()
                         stop_reason = (parsed.get("content") or {}).get("stopReason")
                         print(f"[SESSION] Turn finished: {stop_reason}")
                         events.emit(f"ai-turn-finished-{session_id}", {"stopReason": stop_reason})
@@ -283,7 +340,9 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
 
                     if status == "error":
                         flush_ui_buffer()
+                        flush_thought_buffer()
                         flush_log_buffer()
+                        flush_thought_log_buffer()
                         error_data = (parsed.get("content") or {}).get("error")
                         print(f"[SESSION] Protocol Error: {error_data}")
                         events.emit(f"ai-turn-finished-{session_id}", {"error": error_data})
@@ -297,13 +356,25 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                         events.emit(f"ai-turn-finished-{session_id}", {"error": error_data})
                         continue
 
+                    if status == "agent_thought_chunk":
+                        content = parsed.get("content", "")
+                        if content:
+                            thought_buffer.append(content)
+                            # Flush if buffer is getting large or time has passed
+                            if time.time() - last_thought_emit_time > 0.05 or len("".join(thought_buffer)) > 50:
+                                flush_thought_buffer()
+                            
+                            # Log thought chunks too
+                            thought_log_buffer.append(content)
+                            if len("".join(thought_log_buffer)) > 100:
+                                flush_thought_log_buffer()
+                        continue
+
                     content = parsed.get("content", "")
-                    raw_data = parsed.get("raw", "")
-                    cli_data = raw_data if raw_data else content
-                    events.emit(f"cli-io-{session_id}", {"type": "output", "data": cli_data})
                     if content:
                         ui_buffer.append(content)
-                        if time.time() - last_emit_time > 0.05:
+                        # Flush if buffer is getting large or time has passed
+                        if time.time() - last_emit_time > 0.05 or len("".join(ui_buffer)) > 50:
                             flush_ui_buffer()
                         
                         # Buffer assistant message chunk for logging
@@ -316,6 +387,9 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                 events.emit(f"cli-io-{session_id}", {"type": "output", "data": "[limit] output truncated"})
                 break
         flush_ui_buffer()
+        flush_thought_buffer()
+        flush_log_buffer()
+        flush_thought_log_buffer()
     def read_stderr():
         total = 0
         for line in proc.stderr:
@@ -364,11 +438,14 @@ def _process_queued_messages(session_id: str):
 
     # Process all queued messages
     while queue:
-        msg = queue.pop(0)
+        item = queue.pop(0)
+        msg = item.get("message", "") if isinstance(item, dict) else item
+        images = item.get("images", None) if isinstance(item, dict) else None
+        
         print(f"[SESSION] Processing queued message for {session_id}: {msg[:50]}...")
         # Check if it's QwenProcess (has handle_input) or subprocess (has stdin)
         if hasattr(proc, "handle_input"):
-             proc.handle_input(msg)
+             proc.handle_input(msg, images)
         elif proc.stdin:
             if proc.poll() is not None:
                 print(f"Process {proc.pid} is dead. Cannot write queued message to stdin.")
@@ -536,7 +613,7 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
             _process_queued_messages(session_id)
             
             _emit_progress(session_id, "ready", "Session ready", 100, wd if wd else None)
-            events.emit(f"ai-turn-finished-{session_id}", True)
+            # DO NOT emit ai-turn-finished here, as it will reset the frontend streaming state prematurely
             
         threading.Thread(target=handshake, daemon=True).start()
         
@@ -629,19 +706,39 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
         events.emit("process-status-changed", get_process_statuses())
         print(f"[SESSION] {session_id} error=cli_not_found exe={exe} backend={backend_name}")
 
-def send_message(session_id: str, message: str) -> None:
+def send_message(session_id: str, message: str, images: list = None) -> None:
     sess = _sessions.get(session_id, {})
     events.emit(f"cli-io-{session_id}", {"type": "input", "data": message})
     
     # Log user message (session/prompt)
     logger = _get_logger(session_id)
+    prompt_parts = []
+    if message:
+        prompt_parts.append({"type": "text", "text": message})
+    if images:
+        for img in images:
+            mime_type = img.get("mimeType", "")
+            if mime_type.startswith("image/"):
+                prompt_parts.append({
+                    "type": "image",
+                    "mimeType": mime_type,
+                    "data": img.get("data")
+                })
+            else:
+                prompt_parts.append({
+                    "type": "file",
+                    "mimeType": mime_type,
+                    "data": img.get("data"),
+                    "name": img.get("name", "file")
+                })
+
     if logger:
         # Construct session/prompt payload
         # This matches the Rust implementation structure
         payload = {
             "method": "session/prompt",
             "params": {
-                "prompt": [{"type": "text", "text": message}]
+                "prompt": prompt_parts
             },
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
@@ -652,13 +749,13 @@ def send_message(session_id: str, message: str) -> None:
         print(f"Session {session_id} not ready, queuing message")
         if "msg_queue" not in sess:
             sess["msg_queue"] = []
-        sess["msg_queue"].append(message)
+        sess["msg_queue"].append({"message": message, "images": images})
         return
 
     proc = sess.get("proc")
     if proc:
         if hasattr(proc, "handle_input"):
-             proc.handle_input(message)
+             proc.handle_input(message, images)
         elif proc.stdin:
             if proc.poll() is not None:
                 print(f"Process {proc.pid} is dead. Cannot write to stdin.")

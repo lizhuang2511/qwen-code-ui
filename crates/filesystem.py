@@ -138,6 +138,27 @@ def write_file_content(path: str, content: str) -> Dict:
     p.write_text(content, encoding="utf-8")
     return read_file_content(str(p))
 
+def write_binary_file_content(path: str, base64_content: str) -> Dict:
+    p = Path(path)
+    if p.exists() and p.is_dir():
+        return {
+            "path": str(p),
+            "content": None,
+            "size": 0,
+            "modified": 0,
+            "encoding": "utf-8",
+            "is_text": False,
+            "is_binary": False,
+            "error": "Target path is a directory",
+        }
+    
+    # Remove data URI prefix if present
+    if "," in base64_content:
+        base64_content = base64_content.split(",", 1)[1]
+        
+    p.write_bytes(base64.b64decode(base64_content))
+    return read_file_content(str(p))
+
 def copy_files(source_paths: List[str], target_directory: str) -> List[str]:
     copied_files = []
     target_path = Path(target_directory)

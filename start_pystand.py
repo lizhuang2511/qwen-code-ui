@@ -49,7 +49,7 @@ def get_icon_path() -> Optional[str]:
 def start_backend():
     print("Starting backend server on port 1858...")
     # Use uvicorn directly in a thread instead of subprocess
-    config = uvicorn.Config("server.main:app", host="127.0.0.1", port=1858, reload=False)
+    config = uvicorn.Config("server.main:app", host="0.0.0.0", port=1858, reload=False)
     server = uvicorn.Server(config)
     
     t = threading.Thread(target=server.run, daemon=True)
@@ -239,4 +239,5 @@ if __name__ == "__main__":
     def ticker_wrapper():
         start_ticker(stop_event, window, icon_path)
         
-    webview.start(ticker_wrapper, debug=False, icon=icon_path, private_mode=False)
+    # Enable private mode to force clear cache and ensure new assets are loaded
+    webview.start(ticker_wrapper, debug=False, icon=icon_path, private_mode=True, http_server=True)

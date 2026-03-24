@@ -232,16 +232,34 @@ def toggle_project_tag(project_id: str, tag: str) -> Dict:
         else:
             current_tags.append(tag)
         target_item["tags"] = current_tags
-        PROJECTS_FILE.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+        _write_projects(raw)
         return {"tags": current_tags}
     return {"tags": []}
+
+def _write_projects(data: dict) -> None:
+    try:
+        # Use atomic write to prevent locking issues or partial writes
+        temp_file = PROJECTS_FILE.with_suffix('.tmp')
+        with temp_file.open('w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        # Rename is atomic on POSIX, but on Windows it might fail if destination exists
+        # We handle this by replacing directly if possible
+        temp_file.replace(PROJECTS_FILE)
+    except Exception as e:
+        print(f"[Projects] Failed to write projects: {e}")
+        # Fallback to direct write if temp file replacement fails
+        try:
+            with PROJECTS_FILE.open('w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception as e2:
+            print(f"[Projects] Direct write fallback also failed: {e2}")
 
 def delete_project(project_id: str) -> None:
     _ensure_data_dir()
     raw = _read_projects()
     items = [it for it in raw.get("items", []) if it.get("id") != project_id]
     raw["items"] = items
-    PROJECTS_FILE.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    _write_projects(raw)
 
 def upsert_project(project_id: str, path: str, title: str) -> None:
     _ensure_data_dir()
@@ -257,4 +275,4 @@ def upsert_project(project_id: str, path: str, title: str) -> None:
     if not exists:
         items.append({"id": project_id, "path": path, "title": title})
     raw["items"] = items
-    PROJECTS_FILE.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    _write_projects(raw)

@@ -197,10 +197,14 @@ export const BackendProvider: React.FC<BackendProviderProps> = ({
             
             // If OAuth is selected, update config
             if (useOAuth) {
+              const providers = settings.modelProviders?.openai || [];
+              const providerConfig = providers.find((p: any) => p.id === "coder-model");
+              const isThinking = providerConfig?.generationConfig?.extra_body?.enable_thinking === true;
+
               dispatch({
                 type: "UPDATE_CONFIG",
                 backend: "qwen",
-                config: { useOAuth: true, model: "coder-model" }
+                config: { useOAuth: true, model: "coder-model", enableThinking: isThinking }
               });
             } else if (currentModelName) {
               // Custom model

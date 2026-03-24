@@ -1,10 +1,11 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { api } from "../lib/api";
-import { ArrowLeft, Plus, Trash2, Star, Tag as TagIcon, PanelRight, Layers, X } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Star, Tag as TagIcon, PanelRight, Layers, X, Download } from "lucide-react";
 import {
   Dialog,
   DialogTrigger,
@@ -51,6 +52,8 @@ export default function ProjectsPage() {
   const [selectedTag, setSelectedTag] = React.useState<string>("All");
   const [newTag, setNewTag] = React.useState("");
   const [showTagsPanel, setShowTagsPanel] = React.useState(false);
+  const [showExportDialog, setShowExportDialog] = React.useState(false);
+  const [exportContent, setExportContent] = React.useState("");
   const navigate = useNavigate();
   const { selectedBackend } = useBackend();
   const backendText = getBackendText(selectedBackend);
@@ -158,6 +161,55 @@ export default function ProjectsPage() {
     refreshProjects();
   };
 
+  const handleExport = () => {
+    if (!projects) return;
+
+    const tagMap: Record<string, string[]> = {};
+    const untagged: string[] = [];
+
+    projects.forEach(p => {
+      const path = p.metadata?.path || p.root_path;
+      if (p.tags && p.tags.length > 0) {
+        p.tags.forEach((tag: string) => {
+          if (!tagMap[tag]) tagMap[tag] = [];
+          tagMap[tag].push(path);
+        });
+      } else {
+        untagged.push(path);
+      }
+    });
+
+    let content = "";
+    
+    const sortedTags = Object.keys(tagMap).sort();
+    
+    sortedTags.forEach(tag => {
+      content += `【${tag}】\n`;
+      tagMap[tag].forEach(path => {
+        content += `- ${path}\n`;
+      });
+      content += "\n";
+    });
+
+    if (untagged.length > 0) {
+      content += `【无标签】\n`;
+      untagged.forEach(path => {
+        content += `- ${path}\n`;
+      });
+      content += "\n";
+    }
+
+    setExportContent(content);
+    setShowExportDialog(true);
+
+    navigator.clipboard.writeText(content).then(() => {
+      toast.success(t("projects.exportSuccess", "复制到剪贴板成功"));
+    }).catch((err) => {
+      console.error("Failed to copy to clipboard", err);
+      toast.error(t("projects.exportFailed", "复制到剪贴板失败"));
+    });
+  };
+
   const filteredProjects = React.useMemo(() => {
     if (!projects) return null;
     if (selectedTag === "All") return projects;
@@ -191,6 +243,15 @@ export default function ProjectsPage() {
               </p>
             </div>
             <div className="flex gap-2">
+              <Button 
+                 variant="outline"
+                 className="flex items-center gap-2"
+                 onClick={handleExport}
+              >
+                 <Download className="h-4 w-4" />
+                 {t("projects.export")}
+              </Button>
+
               <Button 
                  variant={showTagsPanel ? "secondary" : "outline"} 
                  className="flex items-center gap-2"
@@ -425,6 +486,38 @@ export default function ProjectsPage() {
            </div>
         </div>
       )}
+
+      {/* Export Dialog */}
+      <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{t("projects.export")}</DialogTitle>
+            <DialogDescription>
+              {t("projects.exportSuccess", "复制到剪贴板成功")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto mt-4 bg-muted/50 p-4 rounded-md font-mono text-sm whitespace-pre-wrap">
+            {exportContent}
+          </div>
+          <DialogFooter className="mt-4">
+            <Button
+              onClick={() => {
+                navigator.clipboard.writeText(exportContent).then(() => {
+                  toast.success(t("projects.exportSuccess", "复制到剪贴板成功"));
+                }).catch((err) => {
+                  console.error("Failed to copy to clipboard", err);
+                  toast.error(t("projects.exportFailed", "复制到剪贴板失败"));
+                });
+              }}
+            >
+              {t("common.copy", "复制")}
+            </Button>
+            <DialogClose asChild>
+              <Button variant="outline">{t("common.close", "关闭")}</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

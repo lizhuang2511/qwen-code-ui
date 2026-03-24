@@ -53,7 +53,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       <div className="px-3 sm:px-6 py-2 sm:py-4">
         <div className="flex items-center w-full">
           {/* Left section - Sidebar trigger + Desktop Logo */}
-          <div className="flex flex-1 items-center gap-1 sm:gap-3">
+          <div className="flex items-center gap-1 sm:gap-3">
             <SidebarTrigger />
             <div
               className={`flex items-center gap-1 ${
@@ -82,7 +82,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           <div className="flex-1"></div>
 
           {/* Right section - Settings + Directory Toggle */}
-          <div className="flex flex-1 items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-1 sm:gap-2 ml-auto">
             {onNewChat && shouldShowDirectoryButton && (
               <Button
                 variant="ghost"
@@ -134,7 +134,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 variant="ghost"
                 size="icon"
                 onClick={onOpenSettings}
-                title={t("common.settings")}
+                title={t("common.settings", "Settings")}
+                style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
               >
                 <SettingsIcon className="h-4 w-4" />
               </Button>

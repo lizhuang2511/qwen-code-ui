@@ -382,12 +382,14 @@ export const useConversationEvents = (
             updateConversation(conversationId, (conv, lastMsg) => {
               conv.isStreaming = true;
               if (lastMsg && lastMsg.sender === "assistant") {
-                // There's an existing AI message.
+                // There's an existing AI message. Check the last part.
                 const lastPart = lastMsg.parts[lastMsg.parts.length - 1];
                 if (lastPart?.type === "text") {
+                  // Append to existing text block if it's the last element
                   lastPart.text += event.payload;
                 } else {
-                  // Create a new text part.
+                  // If the last part is not a text block (e.g., a tool call or thinking block),
+                  // or if there are no parts yet, create a new text part.
                   lastMsg.parts.push({
                     type: "text",
                     text: event.payload,
@@ -417,13 +419,18 @@ export const useConversationEvents = (
           (event) => {
             updateConversation(conversationId, (conv, lastMsg) => {
               conv.isStreaming = true;
+              
               if (lastMsg && lastMsg.sender === "assistant") {
-                const lastPart = lastMsg.parts[lastMsg.parts.length - 1];
-                if (lastPart?.type === "thinking") {
-                  lastPart.thinking += event.payload;
+                // Find the first thinking block in this message
+                const thinkingPart = lastMsg.parts.find(p => p.type === "thinking");
+                
+                if (thinkingPart && thinkingPart.type === "thinking") {
+                  // If a thinking block already exists, append to it regardless of where it is
+                  thinkingPart.thinking += event.payload;
                 } else {
-                  // Create a new text part.
-                  lastMsg.parts.push({
+                  // Create a new thinking part, but ensure it's at the beginning of the message parts
+                  // if there are no other parts, or before text parts
+                  lastMsg.parts.unshift({
                     type: "thinking",
                     thinking: event.payload,
                   });

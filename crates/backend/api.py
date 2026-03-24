@@ -14,6 +14,14 @@ import webview
 import struct
 import sys
 import backend.version_utils as version_utils
+import base64
+from io import BytesIO
+try:
+    from PIL import ImageGrab
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+
 try:
     import win32clipboard
     import win32con
@@ -168,9 +176,10 @@ class Api:
         events.emit("process-status-changed", session.get_process_statuses())
 
     def send_message(self, params: Dict[str, Any]) -> None:
-        session_id = params.get("sessionId", "")
-        message = params.get("message", "")
-        session.send_message(session_id, message)
+        session_id = params.get("sessionId")
+        message = params.get("message")
+        images = params.get("images")
+        session.send_message(session_id, message, images)
 
     def get_process_statuses(self) -> List[Dict[str, Any]]:
         return session.get_process_statuses()
@@ -340,6 +349,9 @@ class Api:
     def write_file_content(self, params: Dict[str, Any]) -> Dict[str, Any]:
         return filesystem.write_file_content(params.get("path", ""), params.get("content", ""))
 
+    def write_binary_file_content(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        return filesystem.write_binary_file_content(params.get("path", ""), params.get("content", ""))
+
     def select_directory(self) -> Optional[str]:
         wins = getattr(webview, "windows", [])
         result = None
@@ -396,6 +408,17 @@ class Api:
     def get_clipboard_content(self) -> Dict[str, Any]:
         result = {"type": "empty", "content": None}
         
+        if HAS_PIL:
+            try:
+                img = ImageGrab.grabclipboard()
+                if img:
+                    buffered = BytesIO()
+                    img.save(buffered, format="PNG")
+                    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                    return {"type": "image", "content": img_str, "format": "png"}
+            except Exception as e:
+                print(f"PIL ImageGrab error: {e}")
+
         if not HAS_WIN32:
             return result
 
@@ -612,6 +635,20 @@ class Api:
             print(f"Failed to read ui settings: {e}")
             return {}
 
+    def get_local_ip(self) -> Dict[str, Any]:
+        """
+        Gets the local LAN IP address of the machine
+        """
+        import socket
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(('8.8.8.8', 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return {"ip": ip}
+        except Exception:
+            return {"ip": "127.0.0.1"}
+
     def save_ui_settings(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Saves UI settings to ui_settings.json in the project root directory
@@ -769,6 +806,45 @@ class Api:
             # Ensure version
             settings["$version"] = 3
             
+            if "modelProviders" not in settings:
+                settings["modelProviders"] = {}
+            if "openai" not in settings["modelProviders"]:
+                settings["modelProviders"]["openai"] = []
+                
+            openai_providers = settings["modelProviders"]["openai"]
+            coder_model_provider = None
+            for p in openai_providers:
+                if p.get("id") == "coder-model":
+                    coder_model_provider = p
+                    break
+            
+            if not coder_model_provider:
+                coder_model_provider = {
+                    "id": "coder-model",
+                    "name": "Qwen OAuth Model",
+                    "generationConfig": {
+                        "maxRetries": 3,
+                        "timeout": 60000,
+                        "samplingParams": {
+                            "temperature": 0.5,
+                            "max_tokens": 4096,
+                            "top_p": 0.95
+                        }
+                    }
+                }
+                openai_providers.append(coder_model_provider)
+            
+            if "generationConfig" not in coder_model_provider:
+                coder_model_provider["generationConfig"] = {}
+            if "extra_body" not in coder_model_provider["generationConfig"]:
+                coder_model_provider["generationConfig"]["extra_body"] = {}
+                
+            if enable_thinking:
+                coder_model_provider["generationConfig"]["extra_body"]["enable_thinking"] = True
+                coder_model_provider["generationConfig"]["timeout"] = 300000
+            else:
+                coder_model_provider["generationConfig"]["extra_body"]["enable_thinking"] = False
+            
             # Write back
             try:
                 with open(path, "w", encoding="utf-8") as f:
@@ -828,6 +904,10 @@ class Api:
             }
             # Increase timeout for thinking models as they take longer
             new_provider_config["generationConfig"]["timeout"] = 300000
+        else:
+            new_provider_config["generationConfig"]["extra_body"] = {
+                "enable_thinking": False
+            }
         
         new_providers.append(new_provider_config)
         settings["modelProviders"]["openai"] = new_providers

@@ -194,7 +194,7 @@ class QwenProcess:
                 break
             line = line_bytes.decode("utf-8", errors="replace")
             # Log raw line for debugging (skip chunks to avoid spam)
-            if '"sessionUpdate":"agent_message_chunk"' not in line and '"sessionUpdate": "agent_message_chunk"' not in line:
+            if '"sessionUpdate":"agent_message_chunk"' not in line and '"sessionUpdate": "agent_message_chunk"' not in line and '"sessionUpdate":"agent_thought_chunk"' not in line and '"sessionUpdate": "agent_thought_chunk"' not in line:
                 print(f"[QwenAdapter] STDOUT: {line[:200].strip()}")
             # Forward raw line to queue for session.py to handle (parsing, emitting events)
             self.stdout_queue.put(line)
@@ -228,7 +228,7 @@ class QwenProcess:
                 raise StopIteration
             return item
 
-    def handle_input(self, user_input: str):
+    def handle_input(self, user_input: str, images: list = None):
         if not self._running or not self.session_id:
             print("[QwenAdapter] Cannot handle input: not running or no session_id")
             return
@@ -236,10 +236,31 @@ class QwenProcess:
         print(f"[QwenAdapter] handle_input received: {user_input[:100]}...")
         self.history.append({"role": "user", "content": user_input.strip()})
         
+        prompt_parts = []
+        if user_input:
+            prompt_parts.append({"type": "text", "text": user_input})
+            
+        if images:
+            for img in images:
+                mime_type = img.get("mimeType", "")
+                if mime_type.startswith("image/"):
+                    prompt_parts.append({
+                        "type": "image",
+                        "mimeType": mime_type,
+                        "data": img.get("data")
+                    })
+                else:
+                    prompt_parts.append({
+                        "type": "file",
+                        "mimeType": mime_type,
+                        "data": img.get("data"),
+                        "name": img.get("name", "file")
+                    })
+
         # Send session/prompt request
         self._send_request("session/prompt", {
             "sessionId": self.session_id,
-            "prompt": [{"type": "text", "text": user_input}]
+            "prompt": prompt_parts
         })
 
     def terminate(self):

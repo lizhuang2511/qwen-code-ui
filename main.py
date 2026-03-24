@@ -57,8 +57,40 @@ def get_entry() -> str:
 
 
 def start_backend():
-    print("Starting backend server on port 1858...")
-    cmd = [sys.executable, "-m", "uvicorn", "server.main:app", "--port", "1858", "--host", "127.0.0.1"]
+    print("Starting backend server...")
+    
+    # Force default values in settings file if not exists
+    settings_path = os.path.join(BASE_DIR, "ui_settings.json")
+    try:
+        if not os.path.exists(settings_path):
+            with open(settings_path, "w", encoding="utf-8") as f:
+                import json
+                f.write(json.dumps({
+                    "webEnabled": False,
+                    "webRemoteAccess": False,
+                    "webUsername": "lizhuang",
+                    "webPassword": "lizhuang",
+                    "webPort": "1858"
+                }))
+    except Exception:
+        pass
+    
+    # Read ui_settings.json for port configuration
+    port = "1858"
+    try:
+        settings_path = os.path.join(BASE_DIR, "ui_settings.json")
+        if os.path.exists(settings_path):
+            with open(settings_path, "r", encoding="utf-8") as f:
+                content = f.read()
+                if content.strip():
+                    import json
+                    settings = json.loads(content)
+                    if "webPort" in settings:
+                        port = str(settings["webPort"])
+    except Exception as e:
+        print(f"Failed to read port from ui_settings.json: {e}")
+        
+    cmd = [sys.executable, "-m", "uvicorn", "server.main:app", "--port", port, "--host", "0.0.0.0"]
     if os.environ.get("FRONTEND_DEV") == "1":
         # Only watch the crates directory to avoid reloading when user files (workspace) change
         cmd.append("--reload")
@@ -179,9 +211,10 @@ def start_ticker(stop_event, window, icon_path=None):
             
             # Check if window is still valid/running
             if not stop_event.is_set():
+                json_str = json.dumps(payload)
+                safe_json = json_str.replace('\\', '\\\\').replace('"', '\\"')
                 w.evaluate_js(
-                    'window.dispatchEvent(new CustomEvent("ticker",{detail:%s}))'
-                    % json.dumps(payload)
+                    f'window.dispatchEvent(new CustomEvent("ticker", {{ detail: JSON.parse("{safe_json}") }}))'
                 )
 
             stop_event.wait(1.0)
@@ -228,7 +261,8 @@ if __name__ == "__main__":
         def ticker_wrapper():
             start_ticker(stop_event, window, icon_path)
             
-        webview.start(ticker_wrapper, debug=(dev == "1"), icon=icon_path, private_mode=False)
+        # Enable private mode to force clear cache and ensure new assets are loaded
+        webview.start(ticker_wrapper, debug=(dev == "1"), icon=icon_path, private_mode=True, http_server=True)
     except KeyboardInterrupt:
         pass
     finally:

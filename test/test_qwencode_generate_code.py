@@ -21,13 +21,25 @@ def extract_event_and_detail(script: str):
     prefix = 'window.dispatchEvent(new CustomEvent('
     assert script.startswith(prefix)
     rest = script[len(prefix) :]
-    parts = rest.split(",{detail:")
-    event_name = parts[0].strip().strip('"').strip("'")
-    json_part = parts[1]
-    assert json_part.endswith("}))")
-    json_str = json_part[:-3]
-    payload = json.loads(json_str)
-    return event_name, payload
+    # Check if it uses JSON.parse("{...}")
+    if "JSON.parse" in rest:
+        # Extract the event name
+        parts = rest.split(', { detail: JSON.parse("')
+        event_name = parts[0].strip().strip('"').strip("'")
+        # Extract the JSON string
+        json_str = parts[1].split('") }))')[0]
+        # Unescape the JSON string
+        json_str = json_str.replace('\\"', '"').replace('\\\\', '\\')
+        payload = json.loads(json_str)
+        return event_name, payload
+    else:
+        parts = rest.split(",{detail:")
+        event_name = parts[0].strip().strip('"').strip("'")
+        json_part = parts[1]
+        assert json_part.endswith("}))")
+        json_str = json_part[:-3]
+        payload = json.loads(json_str)
+        return event_name, payload
 
 
 def test_qwencode_generate_python_code(monkeypatch):
@@ -36,6 +48,11 @@ def test_qwencode_generate_python_code(monkeypatch):
     sys.modules["webview"] = fake_webview
 
     import importlib
+    import os
+    crates_dir = os.path.join(ROOT, "crates")
+    if crates_dir not in sys.path:
+        sys.path.insert(0, crates_dir)
+        
     import backend.api as backend_api
     importlib.reload(backend_api)
     from backend.api import Api

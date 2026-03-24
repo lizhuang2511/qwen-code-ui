@@ -193,6 +193,10 @@ def read_file_content_with_options(req: ReadFileOptionsRequest):
 def write_file_content(req: ContentRequest):
     return backend_api.write_file_content({"path": req.path, "content": req.content})
 
+@router.post("/write-binary-file-content")
+def write_binary_file_content(req: ContentRequest):
+    return backend_api.write_binary_file_content({"path": req.path, "content": req.content})
+
 @router.post("/copy-files")
 def copy_files(req: CopyFilesRequest):
     return backend_api.copy_files({"paths": req.paths, "target": req.target})
@@ -228,6 +232,10 @@ async def update_qwen_settings(request: Request):
 @router.get("/ui-settings")
 def get_ui_settings():
     return backend_api.get_ui_settings()
+
+@router.get("/local-ip")
+def get_local_ip():
+    return backend_api.get_local_ip()
 
 @router.post("/save-ui-settings")
 async def save_ui_settings(request: Request):

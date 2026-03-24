@@ -816,21 +816,40 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
               {/* YOLO Mode Checkbox for OAuth */}
               {qwenConfig.useOAuth && (
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="qwen-oauth-yolo-checkbox"
-                    checked={qwenConfig.yolo || false}
-                    onCheckedChange={(checked) => {
-                      updateQwenConfig({ yolo: checked === true });
-                    }}
-                  />
-                  <label
-                    htmlFor="qwen-oauth-yolo-checkbox"
-                    className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
-                  >
-                    {t("conversations.yoloMode")}
-                  </label>
-                </div>
+                <>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="qwen-oauth-yolo-checkbox"
+                      checked={qwenConfig.yolo || false}
+                      onCheckedChange={(checked) => {
+                        updateQwenConfig({ yolo: checked === true });
+                      }}
+                    />
+                    <label
+                      htmlFor="qwen-oauth-yolo-checkbox"
+                      className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+                    >
+                      {t("conversations.yoloMode")}
+                    </label>
+                  </div>
+
+                  {/* Thinking Mode Checkbox for OAuth */}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="qwen-oauth-thinking-checkbox"
+                      checked={qwenConfig.enableThinking || false}
+                      onCheckedChange={(checked) => {
+                        updateQwenConfig({ enableThinking: checked === true });
+                      }}
+                    />
+                    <label
+                      htmlFor="qwen-oauth-thinking-checkbox"
+                      className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+                    >
+                      Enable Thinking Mode (e.g. for DeepSeek-R1)
+                    </label>
+                  </div>
+                </>
               )}
             </div>
           )}

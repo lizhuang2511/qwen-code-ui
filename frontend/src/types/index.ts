@@ -20,7 +20,20 @@ export type GeminiMessagePart =
   | TextMessagePart
   | ToolCallMessagePart;
 
-export type UserMessagePart = TextMessagePart;
+export interface ImageMessagePart {
+  type: "image";
+  mimeType: string;
+  data: string;
+}
+
+export interface FileMessagePart {
+  type: "file";
+  mimeType: string;
+  data: string;
+  name: string;
+}
+
+export type UserMessagePart = TextMessagePart | ImageMessagePart | FileMessagePart;
 
 export type Message = {
   id: string;

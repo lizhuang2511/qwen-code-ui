@@ -44,15 +44,47 @@ def get_icon_path() -> Optional[str]:
 
 
 def start_backend():
-    print("Starting backend server on port 1858...")
+    print("Starting backend server...")
     
+    # Force default values in settings file if not exists
+    settings_path = os.path.join(BASE_DIR, "ui_settings.json")
+    try:
+        if not os.path.exists(settings_path):
+            with open(settings_path, "w", encoding="utf-8") as f:
+                f.write(json.dumps({
+                    "webEnabled": False,
+                    "webRemoteAccess": False,
+                    "webUsername": "lizhuang",
+                    "webPassword": "lizhuang",
+                    "webPort": "1858"
+                }))
+    except Exception:
+        pass
+    
+    # Read ui_settings.json for port configuration
+    port = 1858
+    try:
+        settings_path = os.path.join(BASE_DIR, "ui_settings.json")
+        if os.path.exists(settings_path):
+            with open(settings_path, "r", encoding="utf-8") as f:
+                content = f.read()
+                if content.strip():
+                    settings = json.loads(content)
+                    if "webPort" in settings:
+                        try:
+                            port = int(settings["webPort"])
+                        except ValueError:
+                            pass
+    except Exception as e:
+        print(f"Failed to read port from ui_settings.json: {e}")
+        
     def run_server():
         try:
             import uvicorn
             # 动态导入以避免循环依赖或过早加载
             from server.main import app
             # 使用 app 对象而不是字符串，避免打包后找不到模块
-            uvicorn.run(app, host="127.0.0.1", port=1858, log_level="info")
+            uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
         except Exception as e:
             print(f"Backend server failed to start: {e}")
 
@@ -221,4 +253,5 @@ if __name__ == "__main__":
     def ticker_wrapper():
         start_ticker(stop_event, window, icon_path)
         
-    webview.start(ticker_wrapper, debug=True, icon=icon_path, private_mode=False)
+    # Enable private mode to force clear cache and ensure new assets are loaded
+    webview.start(ticker_wrapper, debug=True, icon=icon_path, private_mode=True, http_server=True)

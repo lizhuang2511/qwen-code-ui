@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useConversation } from "../contexts/ConversationContext";
@@ -24,7 +24,7 @@ import {
   CardTitle,
   CardDescription,
 } from "../components/ui/card";
-import { Info, UserRound, FolderKanban } from "lucide-react";
+import { Info, UserRound, FolderKanban, FileText } from "lucide-react";
 import { ModelContextProtocol } from "../components/common/ModelContextProtocol";
 import { getBackendText } from "../utils/backendText";
 import { useBackend } from "../contexts/BackendContext";
@@ -45,6 +45,33 @@ export const HomeDashboard: React.FC = () => {
 
   const { selectedBackend } = useBackend();
   const backendText = getBackendText(selectedBackend);
+
+  // Auto-scroll to bottom when entering a conversation or when messages change
+  const prevConversationIdRef = React.useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (currentConversation?.id) {
+      const isNewConversation = prevConversationIdRef.current !== currentConversation.id;
+      prevConversationIdRef.current = currentConversation.id;
+
+      // Small delay to ensure React has rendered the messages in the DOM
+      setTimeout(() => {
+        if (messagesContainerRef.current) {
+          const container = messagesContainerRef.current;
+          
+          if (isNewConversation) {
+            // Always scroll to bottom when entering a new conversation
+            container.scrollTop = container.scrollHeight;
+          } else {
+            // If just adding messages to current conversation, only auto-scroll if already near bottom
+            const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+            if (isNearBottom) {
+              container.scrollTop = container.scrollHeight;
+            }
+          }
+        }
+      }, 50);
+    }
+  }, [currentConversation?.id, currentConversation?.messages?.length, messagesContainerRef]);
 
   return (
     <>
@@ -96,14 +123,45 @@ export const HomeDashboard: React.FC = () => {
                     <>
                       {(() => {
                         if (message.sender === "user") {
-                          return message.parts.map((msgPart, partIndex) => (
-                            <div
-                              key={partIndex}
-                              className="text-sm text-gray-900 dark:text-gray-100 mb-2"
-                            >
-                              <MessageContent content={msgPart.text} />
-                            </div>
-                          ));
+                          return message.parts.map((msgPart, partIndex) => {
+                            if (msgPart.type === "text") {
+                              return (
+                                <div
+                                  key={partIndex}
+                                  className="text-sm text-gray-900 dark:text-gray-100 mb-2"
+                                >
+                                  <MessageContent content={msgPart.text} />
+                                </div>
+                              );
+                            } else if (msgPart.type === "image") {
+                              return (
+                                <div key={partIndex} className="mb-2 max-w-sm">
+                                  <img 
+                                    src={`data:${msgPart.mimeType};base64,${msgPart.data}`} 
+                                    alt="User uploaded" 
+                                    className="rounded-lg border object-contain max-h-96"
+                                  />
+                                </div>
+                              );
+                            } else if (msgPart.type === "file") {
+                              return (
+                                <div key={partIndex} className="mb-2 max-w-sm">
+                                  <div className="flex items-center gap-2 p-3 bg-muted rounded-lg border">
+                                    <FileText className="h-8 w-8 text-muted-foreground shrink-0" />
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-sm font-medium truncate" title={msgPart.name}>
+                                        {msgPart.name || 'File'}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground truncate">
+                                        {msgPart.mimeType || 'Unknown type'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          });
                         }
 
                         const groupedParts = message.parts.reduce<

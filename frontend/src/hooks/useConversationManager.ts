@@ -49,7 +49,7 @@ export const useConversationManager = () => {
         lastUpdated: new Date(),
         isStreaming,
         isActive: true, // New conversations are active by default
-        isNew: true,
+        isNew: messages.length === 0,
         workingDirectory: workingDirectory?.replace(/\\/g, "/").toLowerCase(),
         // For new conversations, use the id as both id and timestamp
         metadata: { timestamp: id, chatId: id },

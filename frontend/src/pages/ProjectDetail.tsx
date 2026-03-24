@@ -378,6 +378,21 @@ export default function ProjectDetailPage() {
                               </Button>
                             </DialogClose>
                             <Button
+                              variant="secondary"
+                              onClick={async () => {
+                                try {
+                                  await api.kill_process({ conversationId: d.id });
+                                  toast.success(t("projects.discussionTerminated", "进程已终止"));
+                                  fetchDiscussions(); // Refresh to update status if necessary
+                                } catch (error) {
+                                  console.error("Failed to terminate process:", error);
+                                  toast.error(t("projects.failedToTerminate", "终止进程失败"));
+                                }
+                              }}
+                            >
+                              {t("conversations.terminateChat", "终止对话")}
+                            </Button>
+                            <Button
                               variant="destructive"
                               onClick={() => handleDeleteDiscussion(d.id)}
                             >

@@ -1,13 +1,20 @@
+// This file is kept for backwards compatibility but is no longer used for listening
+// since all events are now routed through WebSocket for consistency between Desktop and Web.
 export function initPywebviewBridge() {}
 
-export async function pywebviewListen<T>(
+export function pywebviewListen<T>(
   event: string,
   callback: (event: { payload: T }) => void
-): Promise<() => void> {
+): () => void {
   const handler = (e: Event) => {
-    const ce = e as CustomEvent
-    callback({ payload: ce.detail as T })
-  }
-  window.addEventListener(event, handler as EventListener)
-  return () => window.removeEventListener(event, handler as EventListener)
+    const customEvent = e as CustomEvent<T>;
+    // We expect the payload directly in the detail property
+    callback({ payload: customEvent.detail });
+  };
+
+  window.addEventListener(event, handler);
+
+  return () => {
+    window.removeEventListener(event, handler);
+  };
 }

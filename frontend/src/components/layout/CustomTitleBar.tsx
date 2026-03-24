@@ -231,6 +231,7 @@ export const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
                   {menuShortcuts.goMcpServers?.display}
                 </span>
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={handlers.openSettings}
                 className="flex items-center justify-between text-xs"
@@ -242,6 +243,18 @@ export const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
                 <span className="text-xs text-muted-foreground">
                   {menuShortcuts.openSettings?.display}
                 </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setOpenMenu(null);
+                  window.dispatchEvent(new CustomEvent("app:open-web-settings"));
+                }}
+                className="flex items-center justify-between text-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <SettingsIcon size={14} />
+                  Web 设置
+                </div>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

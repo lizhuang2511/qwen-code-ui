@@ -39,6 +39,11 @@ def _parse_single(text: str) -> Dict:
                 val = data.get("result")
                 if isinstance(val, dict) and "stopReason" in val:
                     return {"status": "turn_finished", "content": val, "metadata": {"source": "jsonl"}, "raw": text}
+                
+                # If it has "id" and "result" but no "method", it's a JSON-RPC response (e.g. to session/prompt).
+                if "id" in data and "method" not in data:
+                    return {"status": "response", "content": data, "metadata": {"source": "jsonl"}, "raw": text}
+
                 if isinstance(val, str):
                     return {"status": "parsed", "content": val, "metadata": {"source": "jsonl"}, "raw": text}
                 if isinstance(val, dict):
@@ -96,6 +101,9 @@ def _parse_single(text: str) -> Dict:
                     # Return the full data structure so session.py can extract toolCallId from params.update
                     return {"status": "tool_call_update", "content": data, "metadata": {"source": "jsonl"}, "raw": text}
                 
+                if update_type == "tool_call":
+                    return {"status": "tool_call", "content": data, "metadata": {"source": "jsonl"}, "raw": text}
+                
                 if update_type == "agent_message_chunk":
                     # For message chunks, we still want to extract text for the UI stream
                     content_obj = upd.get("content")
@@ -106,6 +114,15 @@ def _parse_single(text: str) -> Dict:
                         extracted = upd.get("chunk")
                     return {"status": "agent_message_chunk", "content": extracted, "metadata": {"source": "jsonl"}, "raw": text}
 
+                if update_type == "agent_thought_chunk":
+                    content_obj = upd.get("content")
+                    extracted = ""
+                    if isinstance(content_obj, dict):
+                        extracted = _extract_text_from_dict(content_obj)
+                    elif isinstance(upd.get("chunk"), str):
+                        extracted = upd.get("chunk")
+                    return {"status": "agent_thought_chunk", "content": extracted, "metadata": {"source": "jsonl"}, "raw": text}
+
                 # agent_message_chunk may carry content.text or chunk
                 content_obj = upd.get("content")
                 extracted = ""
@@ -115,6 +132,8 @@ def _parse_single(text: str) -> Dict:
                     extracted = upd.get("chunk")
                 
                 # Always return parsed status for session/update to prevent raw JSON display
+                if not extracted:
+                    return {"status": "empty", "content": "", "metadata": {"source": "jsonl"}, "raw": text}
                 return {"status": "parsed", "content": extracted, "metadata": {"source": "jsonl"}, "raw": text}
 
             elif method == "streamAssistantMessageChunk":
@@ -124,12 +143,6 @@ def _parse_single(text: str) -> Dict:
 
             elif method == "session/request_permission":
                 return {"status": "permission_request", "content": data, "metadata": {"source": "jsonl"}, "raw": text}
-            
-            # Handle generic responses (result with stopReason)
-            elif "result" in data and isinstance(data["result"], dict):
-                res = data["result"]
-                if "stopReason" in res:
-                    return {"status": "turn_finished", "content": res, "metadata": {"source": "jsonl"}, "raw": text}
 
             # Handle JSON-RPC errors
             if "error" in data:
@@ -146,6 +159,11 @@ def _parse_single(text: str) -> Dict:
     if m2:
         c = m2.group(1)
         return {"status": "parsed", "content": c, "metadata": {"source": "jsonl"}, "raw": text}
+        
+    # If it looks like JSON-RPC but couldn't be parsed, hide it to prevent raw JSON leaking into UI
+    if text.startswith('{"jsonrpc"') or text.startswith('{"method"') or text.startswith('{"sessionUpdate"'):
+        return {"status": "empty", "content": "", "metadata": {"source": "jsonl"}, "raw": text}
+        
     return {"status": "text", "content": text, "metadata": {"source": "text"}, "raw": text}
 
 

@@ -252,6 +252,11 @@ export const webApi: API = {
     return response.data;
   },
  
+  async write_binary_file_content(params) {
+    const response = await apiClient.post("/write-binary-file-content", params);
+    return response.data;
+  },
+ 
   async select_directory(): Promise<string | null> {
     return null;
   },
@@ -360,6 +365,11 @@ export const webApi: API = {
 
   async delete_tag(params: { tag: string }) {
     const response = await apiClient.delete<string[]>("/tags", { params: { tag: params.tag } });
+    return response.data;
+  },
+
+  async get_local_ip() {
+    const response = await apiClient.get<{ip: string}>("/local-ip");
     return response.data;
   },
 
@@ -522,7 +532,7 @@ interface WebSocketEvent<T = unknown> {
 
 export class WebSocketManager {
   private ws: WebSocket | null = null;
-  private listeners: Map<string, Set<(payload: unknown) => void>> = new Map();
+  private listeners = new Map<string, Set<(payload: unknown) => void>>();
   private reconnectTimeout: number | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
@@ -531,7 +541,10 @@ export class WebSocketManager {
   private connectionReadyResolve: (() => void) | null = null;
 
   constructor() {
-    this.connect();
+    // Only connect if we are in browser environment
+    if (typeof window !== "undefined") {
+      this.connect();
+    }
   }
 
   private connect() {
@@ -588,15 +601,19 @@ export class WebSocketManager {
         const wsEvent: WebSocketEvent = JSON.parse(event.data);
         console.log("📨 WebSocket event:", wsEvent.event, wsEvent.payload);
 
-        const eventListeners = this.listeners.get(wsEvent.event);
-        if (eventListeners) {
-          eventListeners.forEach((listener) => {
-            try {
-              listener(wsEvent.payload);
-            } catch (error) {
-              console.error("❌ Error in WebSocket event listener:", error);
-            }
-          });
+        if (wsEvent.event && wsEvent.payload !== undefined) {
+          const eventListeners = this.listeners.get(wsEvent.event);
+          if (eventListeners) {
+            eventListeners.forEach((listener) => {
+              try {
+                listener(wsEvent.payload);
+              } catch (error) {
+                console.error("❌ Error in WebSocket event listener:", error);
+              }
+            });
+          } else {
+            console.log(`[WS] No handlers registered for event: ${wsEvent.event}`);
+          }
         }
       } catch (error) {
         console.error("❌ Failed to parse WebSocket message:", error);
@@ -702,15 +719,15 @@ export class WebSocketManager {
   }
 }
 
-// Global WebSocket manager instance
-let wsManager: WebSocketManager | null = null;
+// Create a single shared instance
+let wsManagerInstance: WebSocketManager | null = null;
 
-export function getWebSocketManager(): WebSocketManager {
-  if (!wsManager) {
-    wsManager = new WebSocketManager();
+export const getWebSocketManager = (): WebSocketManager => {
+  if (!wsManagerInstance) {
+    wsManagerInstance = new WebSocketManager();
   }
-  return wsManager;
-}
+  return wsManagerInstance;
+};
 
 // Web event listener function that mimics Tauri's listen
 export async function webListen<T>(

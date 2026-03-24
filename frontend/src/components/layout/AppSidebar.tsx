@@ -70,7 +70,15 @@ export function AppSidebar({
             className="w-full text-left text-sm text-muted-foreground hover:text-foreground flex items-center gap-2 px-2 py-2 rounded-md hover:bg-sidebar-accent"
           >
             <SettingsIcon className="h-4 w-4" />
-            {t("common.settings")}
+            {t("common.settings", "General Settings")}
+          </button>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event("app:open-web-settings"))}
+            className="w-full text-left text-sm text-muted-foreground hover:text-foreground flex items-center gap-2 px-2 py-2 rounded-md hover:bg-sidebar-accent mt-1"
+          >
+            <SettingsIcon className="h-4 w-4" />
+            Web 设置
           </button>
         </SidebarFooter>
       </Sidebar>

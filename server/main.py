@@ -6,14 +6,18 @@ import asyncio
 import logging
 from pathlib import Path
 from dotenv import load_dotenv, set_key
+import base64
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.requests import Request
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
+import secrets
 
 # Add crates to path
+
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "crates"))
 
 # Load .env file
@@ -40,11 +44,97 @@ from .api_web import router as api_web_router
 app = FastAPI()
 logger = logging.getLogger("app")
 
-origins = ["http://localhost:1420", "http://127.0.0.1:1420", "tauri://localhost", "https://tauri.localhost"]
+class BasicAuthMiddleware(BaseHTTPMiddleware):
+    def get_web_settings(self):
+        try:
+            settings_path = BASE_DIR / "ui_settings.json"
+            if settings_path.exists():
+                with open(settings_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if content.strip():
+                        settings = json.loads(content)
+                        return {
+                            "enabled": settings.get("webEnabled", False),
+                            "remoteAccess": settings.get("webRemoteAccess", False),
+                            "username": settings.get("webUsername", "lizhuang"),
+                            "password": settings.get("webPassword", "lizhuang")
+                        }
+        except Exception as e:
+            logger.error(f"Failed to read web settings: {e}")
+        
+        return {"enabled": False, "remoteAccess": False, "username": "lizhuang", "password": "lizhuang"}
+
+    async def dispatch(self, request: Request, call_next):
+        # 1. 允许 OPTIONS 请求（CORS 预检）
+        if request.method == "OPTIONS":
+            return await call_next(request)
+            
+        # 2. 检查是不是本地访问或代理访问
+        client_host = request.client.host if request.client else ""
+        forwarded_for = request.headers.get("X-Forwarded-For")
+        
+        # 如果是本地访问且不是代理转发的，直接放行
+        if client_host in ("127.0.0.1", "localhost", "::1") and not forwarded_for:
+            return await call_next(request)
+            
+        # 获取 Web 设置
+        web_settings = self.get_web_settings()
+        
+        # 如果 Web 访问被禁用，直接返回 403 Forbidden
+        if not web_settings["enabled"]:
+            return Response("Web access is disabled", status_code=403)
+            
+        # 检查远程访问限制
+        # 如果未开启远程访问，且访问来源不是本地（或包含代理头），则拒绝访问
+        if not web_settings["remoteAccess"]:
+            if client_host not in ("127.0.0.1", "localhost", "::1", "0.0.0.0") or forwarded_for:
+                return Response("Remote access is disabled", status_code=403)
+            
+        # 3. 检查 Basic Auth (对所有路由进行拦截，强制在首页就弹出登录框)
+        auth = request.headers.get("Authorization")
+        path = request.url.path
+        
+        if not auth or not auth.startswith("Basic "):
+            # 如果是 WebSocket 握手，浏览器原生不支持带 Basic Auth Header，
+            # 强行拦截会导致前端 WS 连接失败。所以对 WS 路径跳过 Basic Auth 拦截。
+            if path == "/api/ws" and request.headers.get("upgrade", "").lower() == "websocket":
+                 return await call_next(request)
+            
+            # 对于图标请求，避免弹窗打断
+            if path == "/favicon.ico":
+                return await call_next(request)
+                
+            return Response(
+                "Unauthorized", 
+                status_code=401, 
+                headers={"WWW-Authenticate": "Basic realm=\"Login Required\""}
+            )
+        
+        try:
+            decoded = base64.b64decode(auth[6:]).decode("utf-8")
+            username, password = decoded.split(":", 1)
+            
+            # 使用 compare_digest 防止计时攻击
+            is_valid_user = secrets.compare_digest(username, web_settings["username"])
+            is_valid_pass = secrets.compare_digest(password, web_settings["password"])
+            
+            if not (is_valid_user and is_valid_pass):
+                raise ValueError()
+        except Exception:
+            return Response(
+                "Unauthorized", 
+                status_code=401, 
+                headers={"WWW-Authenticate": "Basic realm=\"Login Required\""}
+            )
+            
+        return await call_next(request)
+
+app.add_middleware(BasicAuthMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -60,25 +150,45 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
+        write_debug_log(f"[manager] client connected. Total: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
+            write_debug_log(f"[manager] client disconnected. Total: {len(self.active_connections)}")
 
     async def broadcast(self, message: Dict[str, Any]):
         event_name = message.get("event")
         connection_count = len(self.active_connections)
-        logger.debug(f"[broadcast] event={event_name} targets={connection_count}")
+        log_msg = f"[broadcast] event={event_name} targets={connection_count}"
+        logger.debug(log_msg)
+        write_debug_log(log_msg)
+        
         # Use a copy of the list to avoid modification during iteration
-        for connection in list(self.active_connections):
+        for i, connection in enumerate(list(self.active_connections)):
             try:
+                write_debug_log(f"[broadcast] sending to connection {i}")
                 await connection.send_json(message)
-            except Exception:
+                write_debug_log(f"[broadcast] successfully sent to connection {i}")
+            except Exception as e:
+                write_debug_log(f"[broadcast] error sending to connection {i}: {e}")
                 # If sending fails, we might assume the connection is dead,
                 # but we'll let the receive loop handle the disconnect cleanup.
                 pass
 
 manager = ConnectionManager()
+
+import json
+from datetime import datetime
+
+def write_debug_log(msg: str):
+    """Write debug logs to a file in the root directory for troubleshooting."""
+    try:
+        log_path = BASE_DIR / "debug_websocket.log"
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"[{datetime.now().isoformat()}] {msg}\n")
+    except Exception:
+        pass
 
 def event_bridge(event: str, payload: Any):
     """
@@ -91,15 +201,30 @@ def event_bridge(event: str, payload: Any):
         summary = {"keys": keys[:8], "size": len(keys)}
     else:
         summary = {"type": type(payload).__name__}
-    logger.debug(f"[bridge] event={event} payload_summary={summary}")
+        
+    log_msg = f"[bridge] event={event} payload_summary={summary}"
+    logger.debug(log_msg)
+    write_debug_log(log_msg)
+    
     if manager.loop and not manager.loop.is_closed():
+        write_debug_log(f"[bridge] scheduling broadcast for {event}")
         asyncio.run_coroutine_threadsafe(
             manager.broadcast({"event": event, "payload": payload}), 
             manager.loop
         )
+    else:
+        write_debug_log(f"[bridge] manager.loop is not available or closed! event={event}")
 
 # Register the bridge with the events system
-events.set_event_handler(event_bridge)
+import crates.events as crates_events
+import sys
+# If 'events' is also loaded as a top-level module (e.g. by crates/session.py doing `import events`),
+# we need to set the handler there too to ensure it works across the board.
+if "events" in sys.modules:
+    sys.modules["events"].set_event_handler(event_bridge)
+if "crates.events" in sys.modules:
+    sys.modules["crates.events"].set_event_handler(event_bridge)
+crates_events.set_event_handler(event_bridge)
 
 # Removed duplicate @app.get("/api/get-home-directory") as it's better placed in api_web.py or handled consistently
 
@@ -229,6 +354,7 @@ class StartSessionRequest(BaseModel):
 class SendMessageRequest(BaseModel):
     session_id: str = Field(..., alias="sessionId")
     message: str
+    images: Optional[List[Dict[str, str]]] = None # Can contain both image and non-image files now
 
 @app.post("/api/start-session")
 def api_start_session(req: StartSessionRequest) -> Dict[str, Any]:
@@ -255,9 +381,9 @@ def api_send_message(req: SendMessageRequest) -> Dict[str, Any]:
         "[rest] send-message",
         extra={"session_id": req.session_id, "size": size},
     )
-    if not req.session_id or not req.message:
+    if not req.session_id or (not req.message and not req.images):
         return {"ok": False, "error": "missing sessionId or message"}
-    send_message(req.session_id, req.message)
+    send_message(req.session_id, req.message, req.images)
     return {"ok": True}
 
 class ExcludedPathsRequest(BaseModel):

@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { Send, Info, ImagePlus, Play, Loader2 } from "lucide-react";
+import { Send, Info, Play, Loader2, X, Paperclip, FileText } from "lucide-react";
 import { useBackend } from "../../contexts/BackendContext";
 import { getBackendText } from "../../utils/backendText";
 import { CliIO } from "../../types";
@@ -26,6 +26,8 @@ import { useWittyLoadingPhrase } from "../../hooks/useWittyLoadingPhrase";
 
 interface MessageInputBarProps {
   input: string;
+  images?: { mimeType: string; data: string; name?: string }[];
+  setImages?: (images: { mimeType: string; data: string; name?: string }[]) => void;
   isCliInstalled: boolean | null;
   cliIOLogs: CliIO[];
   handleInputChange: (
@@ -57,6 +59,8 @@ export const MessageInputBar = forwardRef<
   (
     {
       input,
+      images = [],
+      setImages,
       isCliInstalled,
       cliIOLogs,
       handleInputChange,
@@ -86,6 +90,39 @@ export const MessageInputBar = forwardRef<
     const { currentPhrase } = useWittyLoadingPhrase({
       isActive: isTimerActive,
     });
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && setImages) {
+        const newImages = Array.from(e.target.files);
+        
+        newImages.forEach((file) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const result = event.target?.result as string;
+            if (result) {
+              const base64Data = result.split(',')[1];
+              setImages([...images, { mimeType: file.type || 'application/octet-stream', data: base64Data, name: file.name }]);
+            }
+          };
+          reader.readAsDataURL(file);
+        });
+        
+        // Clear input so same file can be selected again
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+    };
+
+    const removeImage = (index: number) => {
+      if (setImages) {
+        const newImages = [...images];
+        newImages.splice(index, 1);
+        setImages(newImages);
+      }
+    };
 
     // Expose the insertMention method via ref
     useImperativeHandle(
@@ -141,6 +178,40 @@ export const MessageInputBar = forwardRef<
               <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded-md">
                 {currentPhrase} {formattedDuration}
               </span>
+            </div>
+          )}
+
+          {/* File/Image Previews */}
+          {images.length > 0 && (
+            <div className="flex gap-2 mb-2 overflow-x-auto">
+              {images.map((img, index) => {
+                const isImage = img.mimeType.startsWith('image/');
+                return (
+                  <div key={index} className="relative group shrink-0">
+                    {isImage ? (
+                      <img
+                        src={`data:${img.mimeType};base64,${img.data}`}
+                        alt="Uploaded"
+                        className="h-16 w-16 object-cover rounded-md border"
+                      />
+                    ) : (
+                      <div className="h-16 w-16 flex flex-col items-center justify-center bg-muted rounded-md border text-muted-foreground p-1">
+                        <FileText className="h-6 w-6 mb-1" />
+                        <span className="text-[10px] truncate w-full text-center" title={img.name}>
+                          {img.name || 'File'}
+                        </span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 hidden group-hover:block z-10"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -239,8 +310,23 @@ export const MessageInputBar = forwardRef<
                 </div>
               </DialogContent>
             </Dialog>
-            <Button type="button" disabled={true} size="icon" variant="outline">
-              <ImagePlus />
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageUpload}
+              accept="image/*,.txt,.md,.csv,.pdf,.xlsx"
+              multiple
+              className="hidden"
+            />
+            <Button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isCliInstalled === false}
+              size="icon"
+              variant="outline"
+              title={t("messageInput.uploadFile")}
+            >
+              <Paperclip />
             </Button>
           </form>
         </div>

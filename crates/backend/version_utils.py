@@ -44,33 +44,42 @@ def _load_versions(path: str) -> List[Dict]:
 
 
 
+_config_cache = {}
+
 def get_excluded_paths(path: str) -> List[str]:
     config_path = _get_config_path(path)
     
     # Ensure history directory exists
     history_dir = os.path.dirname(config_path)
     if not os.path.exists(history_dir):
-        os.makedirs(history_dir)
+        os.makedirs(history_dir, exist_ok=True)
         
-    print(f"[调试] 正在尝试读取配置文件: {config_path}")
+    try:
+        mtime = os.path.getmtime(config_path)
+    except FileNotFoundError:
+        mtime = 0
+        
+    cache_entry = _config_cache.get(config_path)
+    if cache_entry and cache_entry['mtime'] == mtime:
+        return cache_entry['excluded']
+        
     if os.path.exists(config_path):
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 excluded = data.get("excluded_paths", [])
-                print(f"[调试] 读取到的排除列表: {excluded}")
+                _config_cache[config_path] = {'mtime': mtime, 'excluded': excluded}
                 return excluded
         except json.JSONDecodeError:
-            print(f"[调试] 配置文件 JSON 解析失败: {config_path}")
             pass
     else:
-        print(f"[调试] 配置文件不存在，创建默认配置: {config_path}")
         try:
             default_config = {"excluded_paths": []}
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(default_config, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            print(f"[调试] 创建默认配置文件失败: {e}")
+            _config_cache[config_path] = {'mtime': os.path.getmtime(config_path), 'excluded': []}
+        except Exception:
+            pass
             
     return []
 

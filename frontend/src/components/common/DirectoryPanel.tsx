@@ -83,6 +83,7 @@ export function DirectoryPanel({
   const [pasteDialogOpen, setPasteDialogOpen] = useState(false);
   const [pasteContent, setPasteContent] = useState<string>("");
   const [pasteFilename, setPasteFilename] = useState<string>("");
+  const [isPastingImage, setIsPastingImage] = useState<boolean>(false);
 
   // Context Menu Actions State
   const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
@@ -442,9 +443,52 @@ export function DirectoryPanel({
       }
 
       // 2. Fallback to system clipboard
+      // Try to read from browser clipboard API first to support images
+      if (navigator.clipboard && navigator.clipboard.read) {
+        try {
+          const items = await navigator.clipboard.read();
+          for (const item of items) {
+            const imageTypes = item.types.filter(type => type.startsWith('image/'));
+            if (imageTypes.length > 0) {
+              const blob = await item.getType(imageTypes[0]);
+              const buffer = await blob.arrayBuffer();
+              const bytes = new Uint8Array(buffer);
+              
+              // Convert to base64 in chunks to avoid call stack size exceeded
+              const chunkSize = 8192;
+              let binary = '';
+              for (let i = 0; i < bytes.length; i += chunkSize) {
+                binary += String.fromCharCode.apply(null, Array.from(bytes.slice(i, i + chunkSize)));
+              }
+              const base64 = btoa(binary);
+              
+              const ext = imageTypes[0].split('/')[1] || 'png';
+              const timestamp = new Date().getTime();
+              
+              setPasteFilename(`screenshot_${timestamp}.${ext}`);
+              setPasteContent(base64);
+              setPasteTargetDir(targetDir);
+              setIsPastingImage(true);
+              setPasteDialogOpen(true);
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to read from navigator.clipboard, falling back to api", e);
+        }
+      }
+
       const clipboard = await api.get_clipboard_content();
       
-      if (clipboard.type === "files" && Array.isArray(clipboard.content)) {
+      if (clipboard.type === "image" && typeof clipboard.content === "string") {
+        const ext = clipboard.format || 'png';
+        const timestamp = new Date().getTime();
+        setPasteFilename(`screenshot_${timestamp}.${ext}`);
+        setPasteContent(clipboard.content);
+        setPasteTargetDir(targetDir);
+        setIsPastingImage(true);
+        setPasteDialogOpen(true);
+      } else if (clipboard.type === "files" && Array.isArray(clipboard.content)) {
         await api.copy_files({ 
           paths: clipboard.content, 
           target: targetDir 
@@ -462,6 +506,7 @@ export function DirectoryPanel({
         setPasteFilename(`${safeName}.md`);
         setPasteContent(text);
         setPasteTargetDir(targetDir);
+        setIsPastingImage(false);
         setPasteDialogOpen(true);
       } else {
         toast.info(t("directoryPanel.clipboardEmpty", "Clipboard is empty or format not supported"));
@@ -479,7 +524,11 @@ export function DirectoryPanel({
     try {
       // Simple path join
       const targetPath = `${pasteTargetDir.replace(/\\/g, "/")}/${pasteFilename}`;
-      await api.write_file_content({ path: targetPath, content: pasteContent });
+      if (isPastingImage) {
+        await api.write_binary_file_content({ path: targetPath, content: pasteContent });
+      } else {
+        await api.write_file_content({ path: targetPath, content: pasteContent });
+      }
       setPasteDialogOpen(false);
       refreshDirectory();
       toast.success(t("directoryPanel.fileCreated", "File created from clipboard"));
@@ -921,10 +970,16 @@ export function DirectoryPanel({
                 className="col-span-3"
               />
             </div>
-            <div className="max-h-[200px] overflow-y-auto p-2 bg-muted rounded text-xs whitespace-pre-wrap">
-              {pasteContent.slice(0, 500)}
-              {pasteContent.length > 500 && "..."}
-            </div>
+            {isPastingImage ? (
+              <div className="flex justify-center max-h-[200px] overflow-y-auto p-2 bg-muted rounded">
+                <img src={`data:image/png;base64,${pasteContent}`} alt="Pasted" className="max-w-full h-auto object-contain" />
+              </div>
+            ) : (
+              <div className="max-h-[200px] overflow-y-auto p-2 bg-muted rounded text-xs whitespace-pre-wrap">
+                {pasteContent.slice(0, 500)}
+                {pasteContent.length > 500 && "..."}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button onClick={handleSavePaste}>{t("common.save", "Save")}</Button>

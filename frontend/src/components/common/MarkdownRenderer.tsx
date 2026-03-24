@@ -109,6 +109,14 @@ export function MarkdownRenderer({ children, isAssistant = false, fontSize }: { 
             />
           ),
           pre: (props) => <pre {...props} className="not-prose" />,
+          img: ({ src, alt, ...props }) => (
+            <img 
+              src={src} 
+              alt={alt} 
+              className="max-w-full h-auto rounded-md border" 
+              {...props} 
+            />
+          ),
         }}
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeRaw, rehypeKatex]}

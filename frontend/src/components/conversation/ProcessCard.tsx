@@ -166,6 +166,15 @@ export function ProcessCard({
             {t("common.cancel")}
           </Button>
           <Button
+            variant="secondary"
+            onClick={() => {
+              onKillProcess(conversation.id);
+              setSelectedConversationForEnd(null);
+            }}
+          >
+            {t("conversations.terminateChat", "终止对话")}
+          </Button>
+          <Button
             variant="destructive"
             onClick={() => {
               onKillProcess(conversation.id);
@@ -210,6 +219,14 @@ export function ProcessCard({
             }}
           >
             {t("common.cancel")}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              onKillProcess(conversation.id);
+            }}
+          >
+            {t("conversations.terminateChat", "终止对话")}
           </Button>
           <Button
             variant="destructive"
@@ -342,6 +359,15 @@ export function ProcessCard({
                                 }
                               >
                                 {t("common.cancel")}
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                onClick={() => {
+                                  onKillProcess(conversation.id);
+                                  setSelectedConversationForEnd(null);
+                                }}
+                              >
+                                {t("conversations.terminateChat", "终止对话")}
                               </Button>
                               <Button
                                 variant="destructive"
