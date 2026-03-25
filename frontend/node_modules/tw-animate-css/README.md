@@ -142,13 +142,13 @@ To customize the animation parameters, use the following classes:
 
 ### Ready-to-Use Animations
 
-| Class                                  | Description                                                                                                                                                                                                                 |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`accordion-down`][Docs_Accordion]     | Accordion down animation. Requires one of `--radix-accordion-content-height`, `--bits-accordion-content-height`, `--reka-accordion-content-height` or `--kb-accordion-content-height` to be set to the content's height.    |
-| [`accordion-up`][Docs_Accordion]       | Accordion up animation. Requires one of `--radix-accordion-content-height`, `--bits-accordion-content-height`, `--reka-accordion-content-height` or `--kb-accordion-content-height` to be set to the content's height.      |
-| [`collapsible-down`][Docs_Collapsible] | Collapsible down animation. Requires `--radix-collapsible-content-height`, `--bits-collapsible-content-height`, `--reka-collapsible-content-height` or `--kb-collapsible-content-height` to be set to the content's height. |
-| [`collapsible-up`][Docs_Collapsible]   | Collapsible up animation. Requires `--radix-collapsible-content-height`, `--bits-collapsible-content-height`, `--reka-collapsible-content-height` or `--kb-collapsible-content-height` to be set to the content's height.   |
-| [`caret-blink`][Docs_Caret]            | Blinking animation for caret/cursor.                                                                                                                                                                                        |
+| Class                                  | Description                                                                                                                                                                                              |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`accordion-down`][Docs_Accordion]     | Accordion down animation. Requires `--radix-accordion-content-height` or one of the [other accordion content height variables][Docs_Accordion_Content_Height] to be set to the content's height.         |
+| [`accordion-up`][Docs_Accordion]       | Accordion up animation. Requires `--radix-accordion-content-height` or one of the [other accordion content height variables][Docs_Accordion_Content_Height] to be set to the content's height.           |
+| [`collapsible-down`][Docs_Collapsible] | Collapsible down animation. Requires `--radix-collapsible-content-height` or one of the [other collapsible content height variables][Docs_Collapsible_Content_Height] to be set to the content's height. |
+| [`collapsible-up`][Docs_Collapsible]   | Collapsible up animation. Requires `--radix-collapsible-content-height` or one of the [other collapsible content height variables][Docs_Collapsible_Content_Height] to be set to the content's height.   |
+| [`caret-blink`][Docs_Caret]            | Blinking animation for caret/cursor.                                                                                                                                                                     |
 
 By the way, if you don't use some of the above animations, they will not be included in the final CSS file. This is because Tailwind CSS kind of does tree-shaking for you. So, if you don't use `accordion-down`, it won't be included in the final CSS file.
 
@@ -215,7 +215,9 @@ By the way, if you don't use some of the above animations, they will not be incl
 [Docs_Spin]: ./docs/transforms/rotate.md
 [Docs_Slide]: ./docs/transforms/translate.md
 [Docs_Accordion]: ./docs/animations/accordion.md
+[Docs_Accordion_Content_Height]: ./docs/animations/accordion.md#setting-content-height
 [Docs_Collapsible]: ./docs/animations/collapsible.md
+[Docs_Collapsible_Content_Height]: ./docs/animations/collapsible.md#setting-content-height
 [Docs_Caret]: ./docs/animations/caret-blink.md
 [MDN_Duration]: https://developer.mozilla.org/en-US/docs/Web/CSS/animation-duration
 [MDN_Ease]: https://developer.mozilla.org/en-US/docs/Web/CSS/animation-timing-function

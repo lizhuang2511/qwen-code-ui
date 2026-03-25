@@ -314,7 +314,7 @@ export const MessageInputBar = forwardRef<
               type="file"
               ref={fileInputRef}
               onChange={handleImageUpload}
-              accept="image/*,.txt,.md,.csv,.pdf,.xlsx"
+              accept="image/*,.txt,.md,.csv,.pdf,.xlsx,.py,.js,.ts,.jsx,.tsx,.json,.html,.css,.java,.c,.cpp,.go,.rs,.php,.rb,.swift"
               multiple
               className="hidden"
             />

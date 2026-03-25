@@ -42,7 +42,7 @@ if !errorlevel! equ 0 (
   where npm.cmd >nul 2>&1
   if !errorlevel! equ 0 (
     echo pnpm not found, using npm...
-    call npm.cmd install
+    call npm.cmd install --legacy-peer-deps
     if errorlevel 1 goto build_error
     call npm.cmd run build
     if errorlevel 1 goto build_error

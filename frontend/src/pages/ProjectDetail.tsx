@@ -54,6 +54,7 @@ export default function ProjectDetailPage() {
   );
   const [error, setError] = React.useState<string | null>(null);
   const [isCreatingDiscussion, setIsCreatingDiscussion] = React.useState(false);
+  const [isClearingDiscussions, setIsClearingDiscussions] = React.useState(false);
   const [loadingDiscussionId, setLoadingDiscussionId] = React.useState<
     string | null
   >(null);
@@ -226,6 +227,34 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const handleClearAllDiscussions = async () => {
+    if (!discussions || discussions.length === 0) return;
+    
+    setIsClearingDiscussions(true);
+    try {
+      // Create an array of delete promises
+      const deletePromises = discussions.map(d => 
+        api.delete_conversation({ chatId: d.id }).catch(err => {
+          console.error(`Failed to delete discussion ${d.id}:`, err);
+          throw err;
+        })
+      );
+      
+      // Wait for all deletions to complete
+      await Promise.all(deletePromises);
+      
+      toast.success(t("projects.allDiscussionsCleared", "All discussions cleared."));
+      fetchDiscussions(); // Refetch discussions
+    } catch (error) {
+      console.error("Failed to clear some discussions:", error);
+      toast.error(t("projects.failedToClearDiscussions", "Failed to clear discussions."));
+      // Still refetch to update the list with whatever was successfully deleted
+      fetchDiscussions();
+    } finally {
+      setIsClearingDiscussions(false);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="flex-1 overflow-y-auto">
@@ -275,20 +304,65 @@ export default function ProjectDetailPage() {
                 {t("projects.previousDiscussions")}
               </h2>
               <div className="flex flex-col items-end gap-2">
-                <Button
-                  onClick={handleNewDiscussion}
-                  disabled={!projectData || isCreatingDiscussion || !!progress}
-                  className="inline-flex items-center gap-2"
-                >
-                  {isCreatingDiscussion || !!progress ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Plus className="h-4 w-4" />
+                <div className="flex items-center gap-2">
+                  {discussions && discussions.length > 0 && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          disabled={isClearingDiscussions}
+                          className="inline-flex items-center gap-2"
+                        >
+                          {isClearingDiscussions ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                          {isClearingDiscussions
+                            ? t("projects.clearing", "Clearing...")
+                            : t("projects.clearAllDiscussions", "Clear All Discussions")}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>{t("common.delete")}</DialogTitle>
+                          <DialogDescription>
+                            {t("projects.clearAllDiscussionsConfirm", "Are you sure you want to clear all discussions in this project? This action cannot be undone.")}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                          <DialogClose asChild>
+                            <Button variant="outline">
+                              {t("common.cancel")}
+                            </Button>
+                          </DialogClose>
+                          <DialogClose asChild>
+                            <Button
+                              variant="destructive"
+                              onClick={handleClearAllDiscussions}
+                            >
+                              {t("common.confirm", "Confirm")}
+                            </Button>
+                          </DialogClose>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   )}
-                  {isCreatingDiscussion || !!progress
-                    ? t("projects.creating")
-                    : t("projects.newDiscussion")}
-                </Button>
+                  <Button
+                    onClick={handleNewDiscussion}
+                    disabled={!projectData || isCreatingDiscussion || !!progress}
+                    className="inline-flex items-center gap-2"
+                  >
+                    {isCreatingDiscussion || !!progress ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
+                    )}
+                    {isCreatingDiscussion || !!progress
+                      ? t("projects.creating")
+                      : t("projects.newDiscussion")}
+                  </Button>
+                </div>
                 {progress && (
                   <InlineSessionProgress progress={progress} className="w-48" />
                 )}

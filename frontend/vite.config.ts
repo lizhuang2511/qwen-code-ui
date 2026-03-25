@@ -22,35 +22,6 @@ export default defineConfig({
     minify: "esbuild", // Ensure minification
     rollupOptions: {
       external: [],
-      output: {
-        manualChunks: (id) => {
-          if (id.includes("node_modules")) {
-            if (
-              id.includes("react") ||
-              id.includes("react-dom") ||
-              id.includes("react-router-dom")
-            ) {
-              return "react-vendor";
-            }
-            if (id.includes("pdfjs-dist") || id.includes("react-pdf")) {
-              return "pdf-vendor";
-            }
-            if (
-              id.includes("codemirror") ||
-              id.includes("@uiw/react-codemirror") ||
-              id.includes("shiki") ||
-              id.includes("highlight.js")
-            ) {
-              return "editor-vendor";
-            }
-            if (id.includes("lucide-react")) {
-              return "icon-vendor";
-            }
-            // Group other dependencies into a single vendor chunk to reduce file count
-            return "vendor";
-          }
-        },
-      },
     },
   },
   optimizeDeps: {

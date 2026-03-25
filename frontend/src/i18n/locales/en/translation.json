@@ -135,7 +135,12 @@
     "all": "All",
     "noTagsAvailable": "No tags available",
     "toggleTag": "Toggle Tag",
-    "chatSessionLoadedSuccessfully": "Chat session loaded successfully."
+    "chatSessionLoadedSuccessfully": "Chat session loaded successfully.",
+    "clearAllDiscussions": "Clear All Discussions",
+    "clearAllDiscussionsConfirm": "Are you sure you want to clear all discussions in this project? This action cannot be undone.",
+    "allDiscussionsCleared": "All discussions cleared.",
+    "failedToClearDiscussions": "Failed to clear discussions.",
+    "clearing": "Clearing..."
   },
 
   "conversations": {

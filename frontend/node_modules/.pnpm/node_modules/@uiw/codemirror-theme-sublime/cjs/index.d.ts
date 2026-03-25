@@ -1,5 +1,0 @@
-import { type CreateThemeOptions } from '@uiw/codemirror-themes';
-export declare const defaultSettingsSublime: CreateThemeOptions['settings'];
-export declare const sublimeDarkStyle: CreateThemeOptions['styles'];
-export declare function sublimeInit(options?: Partial<CreateThemeOptions>): import("@codemirror/state").Extension;
-export declare const sublime: import("@codemirror/state").Extension;
