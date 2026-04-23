@@ -38,6 +38,32 @@ export const webApi: API = {
     return response.data;
   },
 
+  async is_qwen_installed() {
+    const response = await apiClient.get<boolean>("/qwen-installed");
+    return response.data;
+  },
+
+  async install_qwen() {
+    const response = await apiClient.post<{ ok: boolean; installed: boolean; message?: string; error?: string; output?: string }>(
+      "/install-qwen",
+      {}
+    );
+    return response.data;
+  },
+
+  async is_python_installed() {
+    const response = await apiClient.get<boolean>("/python-installed");
+    return response.data;
+  },
+
+  async install_python() {
+    const response = await apiClient.post<{ ok: boolean; installed: boolean; message?: string; error?: string; output?: string }>(
+      "/install-python",
+      {}
+    );
+    return response.data;
+  },
+
   async start_session(params) {
     await apiClient.post("/start-session", params);
   },
@@ -260,6 +286,10 @@ export const webApi: API = {
   async select_directory(): Promise<string | null> {
     return null;
   },
+
+  async select_save_file(_params: { directory?: string; defaultFilename?: string }): Promise<string | null> {
+    return null;
+  },
  
   async set_title(params: { title: string }): Promise<void> {
     document.title = params.title;
@@ -281,7 +311,11 @@ export const webApi: API = {
   async quit_app(): Promise<void> {},
 
   async open_with_default_app(_params: { path: string }): Promise<void> {
-    console.warn("open_with_default_app is not supported in web mode");
+    await apiClient.post("/open-with-default-app", _params);
+  },
+
+  async open_with_thonny(_params: { path: string }): Promise<void> {
+    await apiClient.post("/open-with-thonny", _params);
   },
 
   async copy_files(params) {
@@ -395,6 +429,43 @@ export const webApi: API = {
 
   async toggle_project_tag(params: { projectId: string; tag: string }) {
     const response = await apiClient.post<{ tags: string[] }>("/project/toggle-tag", params);
+    return response.data;
+  },
+
+  async get_skills() {
+    const response = await apiClient.get<string[]>("/skills");
+    return response.data;
+  },
+
+  async add_skill(params: { skill: string }) {
+    const response = await apiClient.post<string[]>("/skills", params);
+    return response.data;
+  },
+
+  async delete_skill(params: { skill: string }) {
+    const response = await apiClient.delete<string[]>("/skills", { params: { skill: params.skill } });
+    return response.data;
+  },
+
+  async toggle_project_skill(params: { projectId: string; skill: string }) {
+    const response = await apiClient.post<{ skills: string[] }>("/project/toggle-skill", params);
+    return response.data;
+  },
+
+  async remove_project_skill(params: { projectId: string; skill: string }) {
+    const response = await apiClient.post<{ skills: string[] }>("/project/remove-skill", params);
+    return response.data;
+  },
+
+  async import_project_skills(params: { projectId: string; skills: string[] }) {
+    const response = await apiClient.post<{ skills: string[] }>("/project/import-skills", params);
+    return response.data;
+  },
+
+  async get_skill_content(params: { skill: string; projectPath?: string }) {
+    const response = await apiClient.get<{ path: string; content: string }>("/skill-content", {
+      params: { skill: params.skill, projectPath: params.projectPath || "" },
+    });
     return response.data;
   },
 
@@ -520,6 +591,7 @@ export interface EnrichedProject {
   sha256: string;
   root_path: string;
   tags?: string[];
+  skills?: string[];
   metadata: ProjectMetadata;
 }
 

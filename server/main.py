@@ -289,6 +289,49 @@ class ToggleTagRequest(BaseModel):
 def api_toggle_tag(req: ToggleTagRequest) -> Dict[str, Any]:
     return projects.toggle_project_tag(req.projectId, req.tag)
 
+@app.get("/api/skills")
+def api_get_skills() -> List[str]:
+    return projects.get_all_skills()
+
+class SkillRequest(BaseModel):
+    skill: str
+
+@app.post("/api/skills")
+def api_add_skill(req: SkillRequest) -> List[str]:
+    return projects.add_skill(req.skill)
+
+@app.delete("/api/skills")
+def api_delete_skill(skill: str) -> List[str]:
+    return projects.delete_skill(skill)
+
+class ToggleSkillRequest(BaseModel):
+    projectId: str
+    skill: str
+
+@app.post("/api/project/toggle-skill")
+def api_toggle_skill(req: ToggleSkillRequest) -> Dict[str, Any]:
+    return projects.toggle_project_skill(req.projectId, req.skill)
+
+class RemoveSkillRequest(BaseModel):
+    projectId: str
+    skill: str
+
+@app.post("/api/project/remove-skill")
+def api_remove_skill(req: RemoveSkillRequest) -> Dict[str, Any]:
+    return projects.remove_project_skill(req.projectId, req.skill)
+
+class ImportSkillsRequest(BaseModel):
+    projectId: str
+    skills: List[str]
+
+@app.post("/api/project/import-skills")
+def api_import_skills(req: ImportSkillsRequest) -> Dict[str, Any]:
+    return projects.import_project_skills(req.projectId, req.skills)
+
+@app.get("/api/skill-content")
+def api_skill_content(skill: str, projectPath: str = "") -> Dict[str, Any]:
+    return projects.get_skill_content(skill, projectPath)
+
 @app.websocket("/api/ws")
 async def websocket_endpoint(ws: WebSocket):
     # Ensure we have a reference to the running loop for the bridge

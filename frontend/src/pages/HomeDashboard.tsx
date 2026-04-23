@@ -24,11 +24,12 @@ import {
   CardTitle,
   CardDescription,
 } from "../components/ui/card";
-import { Info, UserRound, FolderKanban, FileText } from "lucide-react";
+import { Info, UserRound, FolderKanban, FileText, Sparkles, Download, Loader2 } from "lucide-react";
 import { ModelContextProtocol } from "../components/common/ModelContextProtocol";
 import { getBackendText } from "../utils/backendText";
 import { useBackend } from "../contexts/BackendContext";
 import { GeminiMessagePart } from "../types";
+import { api } from "../lib/api";
 
 export const HomeDashboard: React.FC = () => {
   const { t } = useTranslation();
@@ -45,6 +46,58 @@ export const HomeDashboard: React.FC = () => {
 
   const { selectedBackend } = useBackend();
   const backendText = getBackendText(selectedBackend);
+
+  const [qwenDialogOpen, setQwenDialogOpen] = React.useState(false);
+  const [qwenStatus, setQwenStatus] = React.useState<
+    "idle" | "checking" | "installing" | "installed" | "failed"
+  >("idle");
+  const [qwenOutput, setQwenOutput] = React.useState<string>("");
+
+  const [pythonDialogOpen, setPythonDialogOpen] = React.useState(false);
+  const [pythonStatus, setPythonStatus] = React.useState<
+    "idle" | "checking" | "downloading" | "installing" | "installed" | "failed"
+  >("idle");
+  const [pythonOutput, setPythonOutput] = React.useState<string>("");
+
+  const startQwenInstallFlow = React.useCallback(async () => {
+    setQwenDialogOpen(true);
+    setQwenOutput("");
+    setQwenStatus("checking");
+    try {
+      const installed = await api.is_qwen_installed();
+      if (installed) {
+        setQwenStatus("installed");
+        return;
+      }
+      setQwenStatus("installing");
+      const res = await api.install_qwen();
+      setQwenOutput(res.output || "");
+      setQwenStatus(res.installed ? "installed" : "failed");
+    } catch (e) {
+      setQwenStatus("failed");
+    }
+  }, []);
+
+  const startPythonInstallFlow = React.useCallback(async () => {
+    setPythonDialogOpen(true);
+    setPythonOutput("");
+    setPythonStatus("checking");
+    try {
+      const installed = await api.is_python_installed();
+      if (installed) {
+        setPythonStatus("installed");
+        return;
+      }
+      setPythonStatus("downloading");
+      await new Promise((r) => setTimeout(r, 500));
+      setPythonStatus("installing");
+      const res = await api.install_python();
+      setPythonOutput(res.output || "");
+      setPythonStatus(res.installed ? "installed" : "failed");
+    } catch (e) {
+      setPythonStatus("failed");
+    }
+  }, []);
 
   // Auto-scroll to bottom when entering a conversation or when messages change
   const prevConversationIdRef = React.useRef<string | undefined>(undefined);
@@ -299,11 +352,9 @@ ${part.thinking}`;
 
           <p className="text-muted-foreground mb-6">{backendText.tagline}</p>
 
-          {/* Dashboard tiles */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-3xl">
-            {/* Projects Card */}
+          <div className="w-full max-w-3xl flex justify-center">
             <Card
-              className="cursor-pointer transition-colors hover:bg-accent w-full"
+              className="cursor-pointer transition-colors hover:bg-accent w-full max-w-xl"
               onClick={() => navigate("/projects")}
             >
               <CardHeader className="flex flex-row items-center gap-3">
@@ -320,6 +371,9 @@ ${part.thinking}`;
                 </div>
               </CardHeader>
             </Card>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-3xl mt-4">
             <Card
               className="cursor-pointer transition-colors hover:bg-accent w-full"
               onClick={() => navigate("/mcp")}
@@ -338,7 +392,239 @@ ${part.thinking}`;
                 </div>
               </CardHeader>
             </Card>
+
+            <Card
+              className="cursor-pointer transition-colors hover:bg-accent w-full"
+              onClick={() => navigate("/skills")}
+            >
+              <CardHeader className="flex flex-row items-center gap-3">
+                <div className="shrink-0 h-6 w-6 flex items-center justify-center">
+                  <Sparkles className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="text-left">
+                  <CardTitle className="text-base">
+                    {t("dashboard.skillsCard.title", "Skills 管理")}
+                  </CardTitle>
+                  <CardDescription>
+                    {t(
+                      "dashboard.skillsCard.description",
+                      "抽取全局与各项目 Skills，一键导入到项目。"
+                    )}
+                  </CardDescription>
+                </div>
+              </CardHeader>
+            </Card>
           </div>
+
+          <div className="w-full max-w-3xl mt-3 flex justify-center">
+            <Button
+              variant="secondary"
+              className="w-full max-w-xl h-12 flex items-center justify-center gap-2"
+              onClick={startQwenInstallFlow}
+            >
+              <Download className="h-4 w-4" />
+              {t("dashboard.installQwen", "自动安装 Qwen")}
+            </Button>
+          </div>
+
+          <div className="w-full max-w-3xl mt-3 flex justify-center">
+            <Button
+              variant="secondary"
+              className="w-full max-w-xl h-12 flex items-center justify-center gap-2"
+              onClick={startPythonInstallFlow}
+            >
+              <Download className="h-4 w-4" />
+              {t("dashboard.installPython", "自动安装 Python")}
+            </Button>
+          </div>
+
+          <Dialog open={qwenDialogOpen} onOpenChange={setQwenDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>{t("qwenInstall.title", "安装 Qwen Code")}</DialogTitle>
+                <DialogDescription className="sr-only">
+                  {t("qwenInstall.description", "自动安装 Qwen Code 并展示后续配置步骤")}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                <div className="rounded-lg border p-4">
+                  <div className="text-3xl font-semibold tracking-tight flex items-center gap-3">
+                    {qwenStatus === "installing" || qwenStatus === "checking" ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    ) : null}
+                    {qwenStatus === "installed"
+                      ? t("qwenInstall.installed", "已安装")
+                      : qwenStatus === "installing"
+                        ? t("qwenInstall.installing", "正在安装…")
+                        : qwenStatus === "checking"
+                          ? t("qwenInstall.checking", "检查中…")
+                          : qwenStatus === "failed"
+                            ? t("qwenInstall.failed", "安装失败")
+                            : t("qwenInstall.idle", "准备安装")}
+                  </div>
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    {qwenStatus === "failed"
+                      ? t(
+                          "qwenInstall.failedHint",
+                          "若安装失败，请以管理员身份运行后再重试，或重启终端后再检查。"
+                        )
+                      : t(
+                          "qwenInstall.runningHint",
+                          "安装完成后建议重启终端，以确保环境变量生效。"
+                        )}
+                  </div>
+                  {qwenOutput ? (
+                    <pre className="mt-3 text-xs whitespace-pre-wrap break-all bg-muted/50 rounded-md p-3 max-h-40 overflow-auto">
+                      {qwenOutput}
+                    </pre>
+                  ) : null}
+                  <div className="mt-3 flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={startQwenInstallFlow}
+                      disabled={qwenStatus === "installing" || qwenStatus === "checking"}
+                    >
+                      {t("qwenInstall.retry", "重新检查/安装")}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border p-4 space-y-2">
+                  <div className="text-lg font-semibold">
+                    {t("qwenInstall.nextStep", "第二步：Key 获取与配置")}
+                  </div>
+                  <div className="text-sm text-muted-foreground space-y-2">
+                    <div>
+                      {t("qwenInstall.docsLabel", "文档：")}{" "}
+                      <a
+                        href="https://qwenlm.github.io/qwen-code-docs/zh/users/overview/"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline underline-offset-2"
+                      >
+                        https://qwenlm.github.io/qwen-code-docs/zh/users/overview/
+                      </a>
+                    </div>
+                    <div>
+                      {t("qwenInstall.keyLabel", "Key 获取（可选）：")}{" "}
+                      <a
+                        href="https://dashscope.console.aliyun.com/apiKey"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline underline-offset-2"
+                      >
+                        https://dashscope.console.aliyun.com/apiKey
+                      </a>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="font-medium text-foreground">
+                        {t("qwenInstall.configTitle", "配置说明")}
+                      </div>
+                      <div>
+                        {t(
+                          "qwenInstall.configLine1",
+                          "1) 重启终端后进入项目目录，运行 qwen"
+                        )}
+                      </div>
+                      <div>
+                        {t(
+                          "qwenInstall.configLine2",
+                          "2) 选择 Qwen OAuth (Free) 登录（推荐），按提示完成授权"
+                        )}
+                      </div>
+                      <div>
+                        {t(
+                          "qwenInstall.configLine3",
+                          "3) 配置文件通常在 ~/.qwen/settings.json（本应用的 MCP/设置也会读取它）"
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={pythonDialogOpen} onOpenChange={setPythonDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>{t("pythonInstall.title", "安装 Python")}</DialogTitle>
+                <DialogDescription className="sr-only">
+                  {t("pythonInstall.description", "自动安装 Python 并展示后续说明")}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                <div className="rounded-lg border p-4">
+                  <div className="text-3xl font-semibold tracking-tight flex items-center gap-3">
+                    {pythonStatus === "installing" ||
+                    pythonStatus === "checking" ||
+                    pythonStatus === "downloading" ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    ) : null}
+                    {pythonStatus === "installed"
+                      ? t("pythonInstall.installed", "已安装")
+                      : pythonStatus === "downloading"
+                        ? t("pythonInstall.downloading", "正在下载…")
+                        : pythonStatus === "installing"
+                          ? t("pythonInstall.installing", "正在安装…")
+                          : pythonStatus === "checking"
+                            ? t("pythonInstall.checking", "检查中…")
+                            : pythonStatus === "failed"
+                              ? t("pythonInstall.failed", "安装失败")
+                              : t("pythonInstall.idle", "准备安装")}
+                  </div>
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    {pythonStatus === "failed"
+                      ? t(
+                          "pythonInstall.failedHint",
+                          "若安装失败，请确认系统已安装 winget（Windows 应用安装程序），并以管理员身份运行后再重试。"
+                        )
+                      : t(
+                          "pythonInstall.runningHint",
+                          "安装完成后建议重启终端，以确保 python 命令可用。"
+                        )}
+                  </div>
+                  {pythonOutput ? (
+                    <pre className="mt-3 text-xs whitespace-pre-wrap break-all bg-muted/50 rounded-md p-3 max-h-40 overflow-auto">
+                      {pythonOutput}
+                    </pre>
+                  ) : null}
+                  <div className="mt-3 flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={startPythonInstallFlow}
+                      disabled={
+                        pythonStatus === "installing" ||
+                        pythonStatus === "checking" ||
+                        pythonStatus === "downloading"
+                      }
+                    >
+                      {t("pythonInstall.retry", "重新检查/安装")}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border p-4 space-y-2">
+                  <div className="text-lg font-semibold">
+                    {t("pythonInstall.howItWorks", "安装方式")}
+                  </div>
+                  <div className="text-sm text-muted-foreground space-y-2">
+                    <div>
+                      {t(
+                        "pythonInstall.method",
+                        "通过命令行调用 winget 安装 Python（等价于在终端执行安装命令）。"
+                      )}
+                    </div>
+                    <div className="font-mono text-xs break-all bg-muted/50 rounded-md p-3">
+                      winget install -e --id Python.Python.3.12 --accept-package-agreements --accept-source-agreements
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {/* Settings link moved to sidebar footer */}
         </div>

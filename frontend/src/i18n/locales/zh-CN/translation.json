@@ -70,7 +70,49 @@
     "mcpCard": {
       "title": "MCP 服务器",
       "description": "管理 MCP 配置和设置。"
-    }
+    },
+    "skillsCard": {
+      "title": "Skills 管理",
+      "description": "抽取全局与各项目 Skills，一键导入到项目。"
+    },
+    "installQwen": "自动安装 Qwen",
+    "installPython": "自动安装 Python"
+  },
+
+  "qwenInstall": {
+    "title": "安装 Qwen Code",
+    "description": "自动安装 Qwen Code 并展示后续配置步骤",
+    "installed": "已安装",
+    "installing": "正在安装…",
+    "checking": "检查中…",
+    "failed": "安装失败",
+    "idle": "准备安装",
+    "failedHint": "若安装失败，请以管理员身份运行后再重试，或重启终端后再检查。",
+    "runningHint": "安装完成后建议重启终端，以确保环境变量生效。",
+    "retry": "重新检查/安装",
+    "nextStep": "第二步：Key 获取与配置",
+    "docsLabel": "文档：",
+    "keyLabel": "Key 获取（可选）：",
+    "configTitle": "配置说明",
+    "configLine1": "1) 重启终端后进入项目目录，运行 qwen",
+    "configLine2": "2) 选择 Qwen OAuth (Free) 登录（推荐），按提示完成授权",
+    "configLine3": "3) 配置文件通常在 ~/.qwen/settings.json（本应用的 MCP/设置也会读取它）"
+  },
+
+  "pythonInstall": {
+    "title": "安装 Python",
+    "description": "自动安装 Python 并展示后续说明",
+    "installed": "已安装",
+    "downloading": "正在下载…",
+    "installing": "正在安装…",
+    "checking": "检查中…",
+    "failed": "安装失败",
+    "idle": "准备安装",
+    "failedHint": "若安装失败，请确认系统已安装 winget（Windows 应用安装程序），并以管理员身份运行后再重试。",
+    "runningHint": "安装完成后建议重启终端，以确保 python 命令可用。",
+    "retry": "重新检查/安装",
+    "howItWorks": "安装方式",
+    "method": "通过命令行调用 winget 安装 Python（等价于在终端执行安装命令）。"
   },
 
   "titleBar": {
@@ -80,12 +122,44 @@
     "home": "主页",
     "projects": "项目",
     "mcpServers": "MCP 服务器",
+    "skills": "Skills 管理",
     "toggleDarkMode": "切换深色模式",
     "refresh": "刷新",
     "about": "关于 {{name}}",
     "quit": "退出 {{name}}",
     "exit": "退出",
     "settingsMenu": "设置..."
+  },
+
+  "skills": {
+    "title": "Skills 管理",
+    "description": "抽取全局与各项目的 Skills，去重展示；右侧查看对应项目，项目可右键移除。",
+    "failedToLoad": "加载 Skills 失败",
+    "selectedCount": "已选 {{count}} 个",
+    "selectedNone": "未选择",
+    "empty": "暂无 Skills",
+    "pickOne": "请选择一个 Skill",
+    "noProjects": "暂无项目使用该 Skill",
+    "projectsForSkill": "对应项目：{{skill}}",
+    "projectsForSkillEmpty": "对应项目",
+    "removeFromProject": "从该项目移除",
+    "removedFromProject": "已从项目移除",
+    "removeFailed": "移除失败",
+    "noSkillsSelected": "请先勾选 Skills",
+    "copied": "已复制到剪贴板",
+    "copyFailed": "复制失败",
+    "allSkills": "全部 Skills",
+    "selectSkill": "选择 Skill",
+    "selectProject": "选择要导入的项目",
+    "importFromClipboard": "从剪贴板导入到项目",
+    "noImportTarget": "请先选择要导入的项目",
+    "clipboardEmpty": "剪贴板没有可用的文本",
+    "clipboardNoSkills": "剪贴板文本中未解析到 Skills",
+    "imported": "已导入 {{count}} 个",
+    "importFailed": "导入失败",
+    "tabContent": "内容",
+    "tabProjects": "对应项目",
+    "noContent": "未找到该 Skill 的内容"
   },
 
   "projects": {
@@ -126,6 +200,11 @@
     "export": "复制分类",
     "exportSuccess": "复制到剪贴板成功",
     "exportFailed": "复制到剪贴板失败",
+    "saveToCurrentDir": "保存到当前目录",
+    "saveAs": "另存为",
+    "exportSavedTo": "已保存到 {{path}}",
+    "exportSaveFailed": "保存失败",
+    "exportDefaultFileName": "分类列表.txt",
     "manageTags": "管理标签",
     "manageTagsDesc": "选择标签筛选项目。右键点击删除。",
     "newTagName": "新标签名称",
@@ -559,6 +638,7 @@
     "noContent": "无目录内容",
     "openInFileManager": "在系统文件管理器中打开",
     "openWithDefault": "用系统默认应用打开",
+    "openWithThonny": "用 Thonny 打开",
     "newFile": "新建文件",
     "newFolder": "新建文件夹",
     "paste": "粘贴",

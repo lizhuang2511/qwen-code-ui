@@ -71,6 +71,22 @@ class LaunchMcpRequest(BaseModel):
 def check_cli_installed():
     return backend_api.check_cli_installed()
 
+@router.get("/qwen-installed")
+def qwen_installed():
+    return backend_api.is_qwen_installed()
+
+@router.post("/install-qwen")
+def install_qwen():
+    return backend_api.install_qwen()
+
+@router.get("/python-installed")
+def python_installed():
+    return backend_api.is_python_installed()
+
+@router.post("/install-python")
+def install_python():
+    return backend_api.install_python()
+
 @router.post("/kill-process")
 def kill_process(req: ConversationIdRequest):
     backend_api.kill_process({"conversationId": req.conversationId})
@@ -219,6 +235,16 @@ def mcp_launch(req: LaunchMcpRequest):
     return backend_api.launch_qwen_mcp({"path": req.path} if req.path else None)
 
 # --- New endpoints to replace pywebview calls ---
+
+@router.post("/open-with-default-app")
+def open_with_default_app(req: PathRequest):
+    backend_api.open_with_default_app({"path": req.path})
+    return {"ok": True}
+
+@router.post("/open-with-thonny")
+def open_with_thonny(req: PathRequest):
+    backend_api.open_with_thonny({"path": req.path})
+    return {"ok": True}
 
 @router.get("/qwen-settings")
 def get_qwen_settings():

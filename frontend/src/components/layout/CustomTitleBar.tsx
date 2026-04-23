@@ -231,6 +231,18 @@ export const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
                   {menuShortcuts.goMcpServers?.display}
                 </span>
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handlers.goSkills}
+                className="flex items-center justify-between text-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <Server size={14} />
+                  {labels.skills}
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {menuShortcuts.goSkills?.display}
+                </span>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={handlers.openSettings}

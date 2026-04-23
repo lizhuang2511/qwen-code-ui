@@ -41,11 +41,12 @@ export const useToolCallConfirmation = ({
 
         // If approved, update the tool call status in the UI
         if (
-          outcome === "proceed_once" ||
-          outcome === "proceed_always" ||
-          outcome === "proceed_always_server" ||
-          outcome === "proceed_always_tool" ||
-          outcome.startsWith("alwaysAllow")
+          outcome.startsWith("proceed") ||
+          outcome.startsWith("alwaysAllow") ||
+          outcome.startsWith("allow") ||
+          outcome === "option_0" ||
+          outcome === "option_1" ||
+          outcome === "option_2"
         ) {
           updateConversation(activeConversation!, (conv) => {
             let found = false;

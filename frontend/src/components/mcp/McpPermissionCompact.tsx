@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, Wrench, Check, X, Loader2 } from "lucide-react";
+import { ChevronRight, Wrench, Check, CheckCheck, X, Loader2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { McpPermissionRequest } from "../../types";
 
@@ -41,8 +41,11 @@ export function McpPermissionCompact({
   const allowOnceOptions = request.options.filter(
     (opt) => opt.kind === "allow_once"
   );
+  const allowAlwaysOptions = request.options.filter(
+    (opt) => opt.kind === "allow_always"
+  );
   const rejectOptions = request.options.filter(
-    (opt) => opt.kind === "reject_once"
+    (opt) => opt.kind.includes("reject")
   );
 
   return (
@@ -62,8 +65,27 @@ export function McpPermissionCompact({
           className="ml-auto flex items-center gap-1"
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Allow always (green double check) */}
+          {allowAlwaysOptions.slice(0, 1).map((option) => (
+            <Button
+              key={option.optionId}
+              size="sm"
+              variant="default"
+              className="h-6 w-6 p-0 bg-green-700 hover:bg-green-800 text-white"
+              onClick={() => onPermissionResponse(option.optionId)}
+              title={option.name}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <CheckCheck className="h-3 w-3" />
+              )}
+            </Button>
+          ))}
+
           {/* Allow once (green) */}
-          {allowOnceOptions.map((option) => (
+          {allowOnceOptions.slice(0, 1).map((option) => (
             <Button
               key={option.optionId}
               size="sm"
@@ -82,7 +104,7 @@ export function McpPermissionCompact({
           ))}
 
           {/* Reject (red) */}
-          {rejectOptions.map((option) => (
+          {rejectOptions.slice(0, 1).map((option) => (
             <Button
               key={option.optionId}
               size="sm"

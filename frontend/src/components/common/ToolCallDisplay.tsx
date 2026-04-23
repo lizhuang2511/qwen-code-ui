@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Check, X, Loader2, Terminal } from "lucide-react";
+import { Check, CheckCheck, X, Loader2, Terminal } from "lucide-react";
 import { Button } from "../ui/button";
 import type {
   ToolCall,
@@ -429,9 +429,13 @@ function ToolCallDisplayComponent({
                         0 ? (
                         // Use ACP permission options if available
                         (() => {
-                          const allowOptions =
+                          const allowOnceOptions =
                             enhancedToolCall.confirmationRequest.options.filter(
-                              (opt) => opt.kind.includes("allow")
+                              (opt) => opt.kind === "allow_once"
+                            );
+                          const allowAlwaysOptions =
+                            enhancedToolCall.confirmationRequest.options.filter(
+                              (opt) => opt.kind === "allow_always"
                             );
                           const rejectOptions =
                             enhancedToolCall.confirmationRequest.options.filter(
@@ -440,32 +444,55 @@ function ToolCallDisplayComponent({
 
                           return (
                             <>
-                              {/* Always Allow button (blue) if available */}
-                              {allowOptions
-                                .filter((opt) => opt.kind.includes("always"))
-                                .map((option) => (
-                                  <Button
-                                    key={option.optionId}
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-6 w-6 p-0 text-blue-500 dark:text-blue-400 hover:bg-blue-500 hover:bg-opacity-20 border border-blue-500 dark:border-blue-400"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleConfirm(
-                                        enhancedToolCall.id,
-                                        option.optionId
-                                      );
-                                    }}
-                                    title={option.name}
-                                    disabled={isSubmitting}
-                                  >
-                                    {isSubmitting ? (
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                    ) : (
-                                      <Check className="h-3 w-3" />
-                                    )}
-                                  </Button>
-                                ))}
+                              {/* Allow Always button (blue double check) */}
+                              {allowAlwaysOptions.slice(0, 1).map((option) => (
+                                <Button
+                                  key={option.optionId}
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 text-blue-500 dark:text-blue-400 hover:bg-blue-500 hover:bg-opacity-20 border border-blue-500 dark:border-blue-400"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleConfirm(
+                                      enhancedToolCall.id,
+                                      option.optionId
+                                    );
+                                  }}
+                                  title={option.name}
+                                  disabled={isSubmitting}
+                                >
+                                  {isSubmitting ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <CheckCheck className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              ))}
+
+                              {/* Allow Once button (blue single check) */}
+                              {allowOnceOptions.slice(0, 1).map((option) => (
+                                <Button
+                                  key={option.optionId}
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 text-blue-500 dark:text-blue-400 hover:bg-blue-500 hover:bg-opacity-20 border border-blue-500 dark:border-blue-400"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleConfirm(
+                                      enhancedToolCall.id,
+                                      option.optionId
+                                    );
+                                  }}
+                                  title={option.name}
+                                  disabled={isSubmitting}
+                                >
+                                  {isSubmitting ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Check className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              ))}
 
                               {/* Reject button (red) */}
                               {rejectOptions.slice(0, 1).map((option) => (
@@ -565,9 +592,13 @@ function ToolCallDisplayComponent({
                         0 ? (
                         // Use ACP permission options if available - group allow vs reject
                         (() => {
-                          const allowOptions =
+                          const allowOnceOptions =
                             enhancedToolCall.confirmationRequest.options.filter(
-                              (opt) => opt.kind.includes("allow")
+                              (opt) => opt.kind === "allow_once"
+                            );
+                          const allowAlwaysOptions =
+                            enhancedToolCall.confirmationRequest.options.filter(
+                              (opt) => opt.kind === "allow_always"
                             );
                           const rejectOptions =
                             enhancedToolCall.confirmationRequest.options.filter(
@@ -576,50 +607,55 @@ function ToolCallDisplayComponent({
 
                           return (
                             <>
-                              {/* Always Allow button (blue) if available */}
-                              {allowOptions
-                                .filter((opt) => opt.kind.includes("always"))
-                                .map((option) => (
-                                  <Button
-                                    key={option.optionId}
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-6 w-6 p-0 text-blue-500 dark:text-blue-400 hover:bg-blue-500 hover:bg-opacity-20 border border-blue-500 dark:border-blue-400"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleConfirm(
-                                        enhancedToolCall.id,
-                                        option.optionId
-                                      );
-                                    }}
-                                    title={option.name}
-                                    disabled={isSubmitting}
-                                  >
-                                    {isSubmitting ? (
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                    ) : (
-                                      <Check className="h-3 w-3" />
-                                    )}
-                                  </Button>
-                                ))}
+                              {/* Allow Always button (blue double check) */}
+                              {allowAlwaysOptions.slice(0, 1).map((option) => (
+                                <Button
+                                  key={option.optionId}
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 text-blue-500 dark:text-blue-400 hover:bg-blue-500 hover:bg-opacity-20 border border-blue-500 dark:border-blue-400"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleConfirm(
+                                      enhancedToolCall.id,
+                                      option.optionId
+                                    );
+                                  }}
+                                  title={option.name}
+                                  disabled={isSubmitting}
+                                >
+                                  {isSubmitting ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <CheckCheck className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              ))}
 
-                              {/* Allow Once button (green) */}
-                              {/* {allowOptions.filter(opt => !opt.kind.includes('always')).map(option => (
-                              <Button
-                                key={option.optionId}
-                                size="sm"
-                                variant="default"
-                                className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700 text-white px-3 py-1 text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleConfirm(enhancedToolCall.id, option.optionId);
-                                }}
-                                title={option.name}
-                                disabled={isSubmitting}
-                              >
-                                {isSubmitting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                              </Button>
-                            ))} */}
+                              {/* Allow Once button (blue single check) */}
+                              {allowOnceOptions.slice(0, 1).map((option) => (
+                                <Button
+                                  key={option.optionId}
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 text-blue-500 dark:text-blue-400 hover:bg-blue-500 hover:bg-opacity-20 border border-blue-500 dark:border-blue-400"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleConfirm(
+                                      enhancedToolCall.id,
+                                      option.optionId
+                                    );
+                                  }}
+                                  title={option.name}
+                                  disabled={isSubmitting}
+                                >
+                                  {isSubmitting ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Check className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              ))}
 
                               {/* Reject button (red) */}
                               {rejectOptions.slice(0, 1).map((option) => (

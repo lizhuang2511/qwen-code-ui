@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { FolderTree, Settings as SettingsIcon, History, MessageSquarePlus, Play } from "lucide-react";
+import { FolderTree, Settings as SettingsIcon, History, MessageSquarePlus, Play, Sparkles } from "lucide-react";
 import { SmartLogo } from "../branding/SmartLogo";
 import { DesktopText } from "../branding/DesktopText";
 import { ModelContextProtocol } from "../common/ModelContextProtocol";
@@ -147,6 +147,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               title={t("dashboard.mcpCard.title", "MCP Settings")}
             >
               <ModelContextProtocol className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/skills")}
+              title={t("skills.title", "Skills 管理")}
+            >
+              <Sparkles className="h-4 w-4" />
             </Button>
           </div>
         </div>

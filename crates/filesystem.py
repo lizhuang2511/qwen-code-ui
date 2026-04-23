@@ -96,6 +96,23 @@ def list_directory_contents(path: str) -> List[Dict]:
     return entries
 
 def read_file_content(path: str) -> Dict:
+    # 修复大模型生成的路径中可能包含的异常空格（例如中英文交界处的空格）
+    import re
+    if path:
+        # 将 "中文字符 空格 字母/数字/下划线" 的空格去掉，反之亦然
+        # 这里使用比较安全的方式，只去掉路径中那些看起来像是不小心多出来的空格
+        # 但因为 Windows 路径本身可能合法包含空格（比如 "C:\\Program Files"）
+        # 所以我们需要谨慎。如果去除空格后的文件存在，而原文件不存在，我们才替换。
+        p = Path(path)
+        if not p.exists():
+            # 尝试移除中英文之间的空格
+            # 匹配: 中文后面跟着空格，然后是字母/数字，或者字母/数字后面跟着空格，然后是中文
+            clean_path = re.sub(r'([\u4e00-\u9fa5])\s+([a-zA-Z0-9_])', r'\1\2', path)
+            clean_path = re.sub(r'([a-zA-Z0-9_])\s+([\u4e00-\u9fa5])', r'\1\2', clean_path)
+            if Path(clean_path).exists():
+                path = clean_path
+                p = Path(path)
+
     p = Path(path)
     encoding = "utf-8"
     error = None
@@ -119,11 +136,26 @@ def read_file_content(path: str) -> Dict:
     }
 
 def read_binary_file_as_base64(path: str) -> str:
+    import re
+    p = Path(path)
+    if not p.exists():
+        clean_path = re.sub(r'([\u4e00-\u9fa5])\s+([a-zA-Z0-9_])', r'\1\2', path)
+        clean_path = re.sub(r'([a-zA-Z0-9_])\s+([\u4e00-\u9fa5])', r'\1\2', clean_path)
+        if Path(clean_path).exists():
+            path = clean_path
     data = Path(path).read_bytes()
     return base64.b64encode(data).decode("ascii")
 
 def write_file_content(path: str, content: str) -> Dict:
+    import re
     p = Path(path)
+    if not p.exists() and not p.parent.exists():
+        clean_path = re.sub(r'([\u4e00-\u9fa5])\s+([a-zA-Z0-9_])', r'\1\2', path)
+        clean_path = re.sub(r'([a-zA-Z0-9_])\s+([\u4e00-\u9fa5])', r'\1\2', clean_path)
+        if Path(clean_path).parent.exists():
+            path = clean_path
+            p = Path(path)
+    
     if p.exists() and p.is_dir():
         return {
             "path": str(p),
@@ -139,7 +171,15 @@ def write_file_content(path: str, content: str) -> Dict:
     return read_file_content(str(p))
 
 def write_binary_file_content(path: str, base64_content: str) -> Dict:
+    import re
     p = Path(path)
+    if not p.exists() and not p.parent.exists():
+        clean_path = re.sub(r'([\u4e00-\u9fa5])\s+([a-zA-Z0-9_])', r'\1\2', path)
+        clean_path = re.sub(r'([a-zA-Z0-9_])\s+([\u4e00-\u9fa5])', r'\1\2', clean_path)
+        if Path(clean_path).parent.exists():
+            path = clean_path
+            p = Path(path)
+            
     if p.exists() and p.is_dir():
         return {
             "path": str(p),

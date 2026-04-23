@@ -9,6 +9,158 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = BASE_DIR / "data"
 PROJECTS_FILE = DATA_DIR / "projects.json"
 TAGS_FILE = BASE_DIR / "tags.json"
+SKILLS_FILE = BASE_DIR / "skills.json"
+
+def _normalize_skill_name(value: str) -> str:
+    return (value or "").strip()
+
+def _unique_keep_order(values: List[str]) -> List[str]:
+    out: List[str] = []
+    seen = set()
+    for v in values or []:
+        s = _normalize_skill_name(v)
+        if not s:
+            continue
+        if s in seen:
+            continue
+        seen.add(s)
+        out.append(s)
+    return out
+
+def _list_skill_names_from_dir(skills_dir: Path) -> List[str]:
+    try:
+        if not skills_dir.exists() or not skills_dir.is_dir():
+            return []
+        names: List[str] = []
+        for entry in skills_dir.iterdir():
+            try:
+                if not entry.is_dir():
+                    continue
+                skill_md = entry / "SKILL.md"
+                skill_md_lower = entry / "skill.md"
+                if skill_md.exists() or skill_md_lower.exists():
+                    names.append(entry.name)
+                else:
+                    names.append(entry.name)
+            except Exception:
+                continue
+        return _unique_keep_order(names)
+    except Exception:
+        return []
+
+def _project_skill_dirs(project_root: Path) -> List[Path]:
+    return [
+        project_root / "skills",
+        project_root / "skill",
+        project_root / ".trae" / "skills",
+        project_root / ".qwen" / "skills",
+    ]
+
+def _global_qwen_skill_dirs() -> List[Path]:
+    home = Path.home()
+    appdata = os.environ.get("APPDATA")
+    localappdata = os.environ.get("LOCALAPPDATA")
+    candidates: List[Path] = []
+    if appdata:
+        candidates.extend([
+            Path(appdata) / "qwen" / "skills",
+            Path(appdata) / "qwencode" / "skills",
+            Path(appdata) / "qwencode5" / "skills",
+        ])
+    if localappdata:
+        candidates.extend([
+            Path(localappdata) / "qwen" / "skills",
+            Path(localappdata) / "qwencode" / "skills",
+            Path(localappdata) / "qwencode5" / "skills",
+        ])
+    return [
+        home / ".qwen" / "skills",
+        home / ".qwen" / "skills.d",
+        home / ".qwen" / "agents" / "skills",
+        home / ".qwencode" / "skills",
+        home / ".qwencode5" / "skills",
+        home / ".config" / "qwen" / "skills",
+        home / ".config" / "qwencode" / "skills",
+        home / ".config" / "qwencode5" / "skills",
+        home / ".agents" / "skills",
+        BASE_DIR / ".trae" / "skills",
+        *candidates,
+    ]
+
+def _discover_project_skills(project_path: str) -> List[str]:
+    p = _normalize_skill_name(project_path)
+    if not p:
+        return []
+    root = Path(p)
+    names: List[str] = []
+    for d in _project_skill_dirs(root):
+        names.extend(_list_skill_names_from_dir(d))
+    return _unique_keep_order(names)
+
+def _discover_global_skills() -> List[str]:
+    names: List[str] = []
+    for d in _global_qwen_skill_dirs():
+        names.extend(_list_skill_names_from_dir(d))
+    return _unique_keep_order(names)
+
+def _find_skill_doc_in_dir(base_dir: Path, skill_name: str) -> Dict[str, str]:
+    try:
+        if not base_dir.exists() or not base_dir.is_dir():
+            return {"path": "", "content": ""}
+        folder = base_dir / skill_name
+        if not folder.exists() or not folder.is_dir():
+            return {"path": "", "content": ""}
+
+        candidates = [
+            folder / "SKILL.md",
+            folder / "skill.md",
+            folder / "README.md",
+            folder / "readme.md",
+        ]
+        for p in candidates:
+            try:
+                if p.exists() and p.is_file():
+                    return {
+                        "path": str(p),
+                        "content": p.read_text(encoding="utf-8", errors="ignore"),
+                    }
+            except Exception:
+                continue
+        return {"path": "", "content": ""}
+    except Exception:
+        return {"path": "", "content": ""}
+
+def get_skill_content(skill: str, project_path: str = "") -> Dict[str, str]:
+    _ensure_data_dir()
+    s = _normalize_skill_name(skill)
+    if not s:
+        return {"path": "", "content": ""}
+
+    proj_path = _normalize_skill_name(project_path)
+    if proj_path:
+        root = Path(proj_path)
+        for d in _project_skill_dirs(root):
+            hit = _find_skill_doc_in_dir(d, s)
+            if hit.get("path"):
+                return hit
+
+    for d in _global_qwen_skill_dirs():
+        hit = _find_skill_doc_in_dir(d, s)
+        if hit.get("path"):
+            return hit
+
+    projects_raw = _read_projects()
+    for it in projects_raw.get("items", []):
+        p = _normalize_skill_name(it.get("path", ""))
+        if not p:
+            continue
+        root = Path(p)
+        for d in _project_skill_dirs(root):
+            hit = _find_skill_doc_in_dir(d, s)
+            if hit.get("path"):
+                return hit
+
+    return {"path": "", "content": ""}
 
 def hash_path(path: str) -> str:
     abs_path = os.path.abspath(path)
@@ -53,6 +205,23 @@ def _ensure_data_dir():
         except Exception:
             pass
         TAGS_FILE.write_text(json.dumps({"tags": initial_tags}, ensure_ascii=False), encoding="utf-8")
+
+    if not SKILLS_FILE.exists():
+        initial_skills = []
+        try:
+            proj_raw = _read_projects()
+            if "skills" in proj_raw:
+                for s in proj_raw["skills"]:
+                    if s not in initial_skills:
+                        initial_skills.append(s)
+
+            for item in proj_raw.get("items", []):
+                for s in item.get("skills", []):
+                    if s not in initial_skills:
+                        initial_skills.append(s)
+        except Exception:
+            pass
+        SKILLS_FILE.write_text(json.dumps({"skills": initial_skills}, ensure_ascii=False), encoding="utf-8")
 
     # Ensure project IDs match their paths (Migration for legacy frontend-generated hashes)
     try:
@@ -155,10 +324,18 @@ def list_enriched_projects() -> List[Dict]:
         if updated_at:
             metadata["updated_at"] = updated_at
 
+        stored_skills = it.get("skills", [])
+        disabled_skills = it.get("disabled_skills", [])
+        discovered_skills = _discover_project_skills(metadata.get("path", ""))
+        merged_skills = _unique_keep_order(list(stored_skills) + list(discovered_skills))
+        disabled_set = set([_normalize_skill_name(s) for s in disabled_skills or [] if _normalize_skill_name(s)])
+        merged_skills = [s for s in merged_skills if s not in disabled_set]
+
         enriched.append({
             "sha256": project_id,
             "root_path": it.get("path", ""),
             "tags": it.get("tags", []),
+            "skills": merged_skills,
             "metadata": metadata,
             "_sort_time": sort_time
         })
@@ -214,6 +391,183 @@ def delete_tag(tag: str) -> List[str]:
                 item["tags"].remove(tag)
         PROJECTS_FILE.write_text(json.dumps(projects_raw, ensure_ascii=False), encoding="utf-8")
     return tags
+
+def _read_skills() -> Dict:
+    if not SKILLS_FILE.exists():
+        return {"skills": []}
+    try:
+        content = SKILLS_FILE.read_text(encoding="utf-8").strip()
+        if not content:
+            return {"skills": []}
+        return json.loads(content)
+    except json.JSONDecodeError:
+        return {"skills": []}
+
+def get_all_skills() -> List[str]:
+    _ensure_data_dir()
+    raw = _read_skills()
+    persisted = raw.get("skills", [])
+    global_discovered = _discover_global_skills()
+    projects_raw = _read_projects()
+    project_paths = [it.get("path", "") for it in projects_raw.get("items", [])]
+    discovered_from_projects: List[str] = []
+    stored_from_projects: List[str] = []
+    for it in projects_raw.get("items", []):
+        stored_from_projects.extend(it.get("skills", []) or [])
+    for p in project_paths:
+        discovered_from_projects.extend(_discover_project_skills(p))
+    merged = _unique_keep_order(list(persisted) + list(global_discovered) + list(stored_from_projects) + list(discovered_from_projects))
+    return merged
+
+def add_skill(skill: str) -> List[str]:
+    _ensure_data_dir()
+    raw = _read_skills()
+    skills = raw.get("skills", [])
+    if skill not in skills:
+        skills.append(skill)
+        raw["skills"] = skills
+        SKILLS_FILE.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    return skills
+
+def add_skills(new_skills: List[str]) -> List[str]:
+    _ensure_data_dir()
+    raw = _read_skills()
+    skills = raw.get("skills", [])
+    existing = set(skills)
+    changed = False
+    for s in new_skills:
+        s2 = _normalize_skill_name(s)
+        if not s2:
+            continue
+        if s2 not in existing:
+            skills.append(s2)
+            existing.add(s2)
+            changed = True
+    if changed:
+        raw["skills"] = skills
+        SKILLS_FILE.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    return skills
+
+def delete_skill(skill: str) -> List[str]:
+    _ensure_data_dir()
+    raw = _read_skills()
+    skills = raw.get("skills", [])
+    normalized = _normalize_skill_name(skill)
+    if normalized in skills:
+        skills.remove(normalized)
+        raw["skills"] = skills
+        SKILLS_FILE.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+
+    projects_raw = _read_projects()
+    changed = False
+    for item in projects_raw.get("items", []):
+        if "skills" in item and normalized in item["skills"]:
+            item["skills"].remove(normalized)
+            changed = True
+        if "disabled_skills" in item and normalized in item["disabled_skills"]:
+            item["disabled_skills"].remove(normalized)
+            changed = True
+    if changed:
+        _write_projects(projects_raw)
+
+    return skills
+
+def toggle_project_skill(project_id: str, skill: str) -> Dict:
+    _ensure_data_dir()
+    raw = _read_projects()
+    items = raw.get("items", [])
+    target_item = None
+    for item in items:
+        if item.get("id") == project_id:
+            target_item = item
+            break
+
+    if target_item:
+        s = _normalize_skill_name(skill)
+        current_skills = _unique_keep_order(target_item.get("skills", []))
+        disabled_skills = _unique_keep_order(target_item.get("disabled_skills", []))
+        disabled_set = set(disabled_skills)
+
+        if s in current_skills and s not in disabled_set:
+            disabled_skills.append(s)
+        else:
+            disabled_skills = [x for x in disabled_skills if x != s]
+            current_skills = _unique_keep_order(current_skills + [s])
+
+        target_item["skills"] = current_skills
+        target_item["disabled_skills"] = _unique_keep_order(disabled_skills)
+        _write_projects(raw)
+        merged = _unique_keep_order(current_skills + _discover_project_skills(target_item.get("path", "")))
+        merged = [x for x in merged if x not in set(target_item.get("disabled_skills", []))]
+        return {"skills": merged}
+    return {"skills": []}
+
+def remove_project_skill(project_id: str, skill: str) -> Dict:
+    _ensure_data_dir()
+    raw = _read_projects()
+    items = raw.get("items", [])
+    target_item = None
+    for item in items:
+        if item.get("id") == project_id:
+            target_item = item
+            break
+
+    if target_item:
+        s = _normalize_skill_name(skill)
+        current_skills = _unique_keep_order(target_item.get("skills", []))
+        current_skills = [x for x in current_skills if x != s]
+        disabled_skills = _unique_keep_order(target_item.get("disabled_skills", []))
+        if s and s not in disabled_skills:
+            disabled_skills.append(s)
+        target_item["skills"] = current_skills
+        target_item["disabled_skills"] = _unique_keep_order(disabled_skills)
+        _write_projects(raw)
+        merged = _unique_keep_order(current_skills + _discover_project_skills(target_item.get("path", "")))
+        merged = [x for x in merged if x not in set(target_item.get("disabled_skills", []))]
+        return {"skills": merged}
+    return {"skills": []}
+
+def import_project_skills(project_id: str, skills: List[str]) -> Dict:
+    _ensure_data_dir()
+    cleaned: List[str] = []
+    seen = set()
+    for s in skills or []:
+        s2 = _normalize_skill_name(s)
+        if not s2:
+            continue
+        if s2 in seen:
+            continue
+        seen.add(s2)
+        cleaned.append(s2)
+
+    if len(cleaned) == 0:
+        return {"skills": []}
+
+    add_skills(cleaned)
+
+    raw = _read_projects()
+    items = raw.get("items", [])
+    target_item = None
+    for item in items:
+        if item.get("id") == project_id:
+            target_item = item
+            break
+
+    if not target_item:
+        return {"skills": []}
+
+    current = target_item.get("skills", [])
+    merged = _unique_keep_order(list(current) + list(cleaned))
+    disabled_skills = _unique_keep_order(target_item.get("disabled_skills", []))
+    disabled_skills = [x for x in disabled_skills if x not in set(cleaned)]
+    target_item["skills"] = merged
+    target_item["disabled_skills"] = _unique_keep_order(disabled_skills)
+    _write_projects(raw)
+    discovered = _discover_project_skills(target_item.get("path", ""))
+    merged2 = _unique_keep_order(merged + discovered)
+    disabled_set2 = set(target_item.get("disabled_skills", []))
+    merged2 = [x for x in merged2 if x not in disabled_set2]
+    return {"skills": merged2}
 
 def toggle_project_tag(project_id: str, tag: str) -> Dict:
     _ensure_data_dir()

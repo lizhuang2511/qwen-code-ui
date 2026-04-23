@@ -1,11 +1,11 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { api } from "../lib/api";
-import { ArrowLeft, Plus, Trash2, Star, Tag as TagIcon, PanelRight, Layers, X, Download } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Star, Tag as TagIcon, PanelRight, Layers, X, Download, Search } from "lucide-react";
 import {
   Dialog,
   DialogTrigger,
@@ -54,9 +54,80 @@ export default function ProjectsPage() {
   const [showTagsPanel, setShowTagsPanel] = React.useState(false);
   const [showExportDialog, setShowExportDialog] = React.useState(false);
   const [exportContent, setExportContent] = React.useState("");
+  const [isSavingExport, setIsSavingExport] = React.useState(false);
+  const [searchKeyword, setSearchKeyword] = React.useState("");
+  const [searchQuery, setSearchQuery] = React.useState("");
   const navigate = useNavigate();
+  const { workingDirectory } = useOutletContext<{ workingDirectory: string }>();
   const { selectedBackend } = useBackend();
   const backendText = getBackendText(selectedBackend);
+
+  const joinPath = React.useCallback((dir: string, fileName: string) => {
+    const normalized = (dir || "").replace(/[\\/]+$/, "");
+    const sep = normalized.includes("\\") ? "\\" : "/";
+    if (!normalized) return fileName;
+    return `${normalized}${sep}${fileName}`;
+  }, []);
+
+  const downloadTextFile = React.useCallback((content: string, fileName: string) => {
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const saveExportToPath = React.useCallback(
+    async (path: string) => {
+      await api.write_file_content({ path, content: exportContent });
+      toast.success(t("projects.exportSavedTo", { path }));
+    },
+    [exportContent, t]
+  );
+
+  const handleSaveExportToCurrentDir = React.useCallback(async () => {
+    const fileName = t("projects.exportDefaultFileName", "分类列表.txt");
+    const targetPath = joinPath(workingDirectory, fileName);
+    try {
+      setIsSavingExport(true);
+      await saveExportToPath(targetPath);
+    } catch (e) {
+      console.error("Failed to save export to current directory", e);
+      toast.error(t("projects.exportSaveFailed", "保存失败"));
+    } finally {
+      setIsSavingExport(false);
+    }
+  }, [joinPath, saveExportToPath, t, workingDirectory]);
+
+  const handleSaveExportAs = React.useCallback(async () => {
+    const fileName = t("projects.exportDefaultFileName", "分类列表.txt");
+    try {
+      setIsSavingExport(true);
+      const selectedPath = await api.select_save_file({
+        directory: workingDirectory,
+        defaultFilename: fileName,
+      });
+      if (selectedPath) {
+        await saveExportToPath(selectedPath);
+        return;
+      }
+      downloadTextFile(exportContent, fileName);
+    } catch (e) {
+      console.error("Failed to save export as", e);
+      try {
+        downloadTextFile(exportContent, fileName);
+      } catch {
+        toast.error(t("projects.exportSaveFailed", "保存失败"));
+      }
+    } finally {
+      setIsSavingExport(false);
+    }
+  }, [downloadTextFile, exportContent, saveExportToPath, t, workingDirectory]);
 
   const refreshProjects = React.useCallback(async () => {
     try {
@@ -212,9 +283,22 @@ export default function ProjectsPage() {
 
   const filteredProjects = React.useMemo(() => {
     if (!projects) return null;
-    if (selectedTag === "All") return projects;
-    return projects.filter(p => p.tags && p.tags.includes(selectedTag));
-  }, [projects, selectedTag]);
+    let filtered = projects;
+    
+    if (selectedTag !== "All") {
+      filtered = filtered.filter(p => p.tags && p.tags.includes(selectedTag));
+    }
+    
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(p => 
+        p.metadata.friendly_name.toLowerCase().includes(query) || 
+        (p.metadata.path && p.metadata.path.toLowerCase().includes(query))
+      );
+    }
+    
+    return filtered;
+  }, [projects, selectedTag, searchQuery]);
 
   return (
     <div className="flex w-full h-full overflow-hidden">
@@ -243,6 +327,26 @@ export default function ProjectsPage() {
               </p>
             </div>
             <div className="flex gap-2">
+              <div className="flex items-center gap-2 mr-2">
+                <Input
+                  placeholder={t("search.filterItems")}
+                  value={searchKeyword}
+                  onChange={(e) => setSearchKeyword(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') setSearchQuery(searchKeyword);
+                  }}
+                  className="w-48 h-9"
+                />
+                <Button 
+                  variant="outline" 
+                  className="h-9 px-3"
+                  onClick={() => setSearchQuery(searchKeyword)}
+                >
+                  <Search className="h-4 w-4 mr-2" />
+                  {t("common.search")}
+                </Button>
+              </div>
+
               <Button 
                  variant="outline"
                  className="flex items-center gap-2"
@@ -500,6 +604,12 @@ export default function ProjectsPage() {
             {exportContent}
           </div>
           <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={handleSaveExportToCurrentDir} disabled={isSavingExport}>
+              {t("projects.saveToCurrentDir", "保存到当前目录")}
+            </Button>
+            <Button variant="outline" onClick={handleSaveExportAs} disabled={isSavingExport}>
+              {t("projects.saveAs", "另存为")}
+            </Button>
             <Button
               onClick={() => {
                 navigator.clipboard.writeText(exportContent).then(() => {

@@ -33,11 +33,13 @@
       "url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
       "env_key": "DASHSCOPE_API_KEY",
       "models": [
-        "qwen-max",
-        "qwen-plus",
-        "qwen-turbo",
-        "qwen-coder-plus",
-        "qwen-coder-turbo"
+        "qwen3.6-plus",
+        "qwen3.6-flash",
+        "qwen3-max",
+        "deepseek-v3.2",
+        "glm-5.1",
+        "MiniMax-M2.5",
+        "kimi-k2.5"
       ]
     }
   ]

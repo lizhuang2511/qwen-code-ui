@@ -41,9 +41,14 @@ export const useMessageHandler = ({
   const conversationModes = React.useRef<Record<string, string>>({});
   const { selectedBackend, getApiConfig, state: backendState } = useBackend();
 
+  const defaultApprovalMode =
+    selectedBackend === "qwen" && backendState.configs.qwen.yolo ? "yolo" : "default";
+
   // Get current values based on active conversation or defaults
   const currentInput = activeConversation ? (inputState[activeConversation] || "") : (inputState["new"] || "");
-  const currentApprovalMode = activeConversation ? (approvalModeState[activeConversation] || "default") : (approvalModeState["new"] || "default");
+  const currentApprovalMode = activeConversation
+    ? (approvalModeState[activeConversation] ?? defaultApprovalMode)
+    : (approvalModeState["new"] ?? defaultApprovalMode);
 
   const [imagesState, setImagesState] = useState<Record<string, { mimeType: string; data: string; name?: string }[]>>({});
   const currentImages = activeConversation ? (imagesState[activeConversation] || []) : (imagesState["new"] || []);
@@ -243,6 +248,15 @@ export const useMessageHandler = ({
         const timestamp = Date.now();
         convId = timestamp.toString();
         createNewConversation(convId, currentInput.slice(0, 50), [newMessage], true);
+        setApprovalModeState((prev) => {
+          if (!Object.prototype.hasOwnProperty.call(prev, "new")) {
+            return prev;
+          }
+          return {
+            ...prev,
+            [convId]: prev["new"],
+          };
+        });
         setActiveConversation(convId);
         // IMPORTANT: Wait for event listeners to be fully set up before proceeding
         await setupEventListenerForConversation(convId);
@@ -352,6 +366,7 @@ export const useMessageHandler = ({
             geminiAuth,
             llxprtConfig,
           });
+          conversationModes.current[convId] = currentApprovalMode;
         }
 
         // Send approval mode command if needed (fallback check)
@@ -407,6 +422,7 @@ export const useMessageHandler = ({
       fetchProcessStatuses,
       generateTitleIfNeeded,
       setInput,
+      defaultApprovalMode,
     ]
   );
 

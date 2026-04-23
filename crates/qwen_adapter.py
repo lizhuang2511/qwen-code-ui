@@ -41,8 +41,8 @@ class QwenProcess:
             self.stderr_queue.put(msg)
             return
 
-        # Use experimental-acp flag
-        cmd = [self.executable, "--experimental-acp", "--no-telemetry"]
+        # Use acp flag
+        cmd = [self.executable, "--acp", "--no-telemetry"]
         if self.yolo:
             cmd.append("--yolo")
         if self.model:

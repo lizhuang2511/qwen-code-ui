@@ -855,9 +855,9 @@ def handle_permission_response(session_id: str, tool_call_id: str, outcome: str)
 
     proc = s.get("proc")
     if proc and hasattr(proc, "send_response"):
-         is_approved = outcome.startswith("proceed") or outcome.startswith("allow")
+         is_approved = outcome.startswith("proceed") or outcome.startswith("allow") or outcome in ("option_0", "option_1", "option_2")
          print(f"[SESSION] Sending response to proc: approved={is_approved}")
-         print(f"[SESSION] 后端: 开始处理权限响应, 准备发送到适配器: req_id={req_id}")
+         print(f"[SESSION] 后端: 开始处理权限响应, 准备发送到适配器: req_id={req_id}, outcome={outcome}")
          
          if is_approved:
              # Construct ACP PermissionResult - nested based on Rust source

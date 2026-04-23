@@ -32,6 +32,7 @@ import { HomeDashboard } from "./pages/HomeDashboard";
 import ProjectsPage from "./pages/Projects";
 import ProjectDetailPage from "./pages/ProjectDetail";
 import { McpServersPage } from "./pages/McpServersPage";
+import SkillsPage from "./pages/SkillsPage";
 
 // Hooks
 import { useConversationManager } from "./hooks/useConversationManager";
@@ -808,6 +809,7 @@ function App() {
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="projects/:id" element={<ProjectDetailPage />} />
           <Route path="mcp" element={<McpServersPage />} />
+          <Route path="skills" element={<SkillsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

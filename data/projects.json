@@ -4,7 +4,9 @@
       "id": "f25ea7439c3b8cd9d2c4195d8ad822eb969bf8f53737a93b04a5737b10c5ef02",
       "path": "d:/qwencode/临时计算",
       "title": "临时计算",
-      "tags": []
+      "tags": [
+        "临时"
+      ]
     },
     {
       "id": "3b4ff6e9d67141bdaec98fae29cc44ed21bd414d601c8e0108a8459746deae4f",
@@ -77,6 +79,46 @@
       "id": "fcdbe86b990400107722d8e7f12294496d9f9d319ffd8f680f41eb02421c795b",
       "path": "d:/giteecode/qwencode5",
       "title": "qwencode5"
+    },
+    {
+      "id": "60fcc240c873fc56b19561797e74364d24e6b0fcc32f0c0988e23d46c28a4c49",
+      "path": "D:\\giteecode\\情绪管理",
+      "title": "情绪管理"
+    },
+    {
+      "id": "c0523342b299d690dec0a6b242f04465a4f63ca3ae7d71fcc989d1656dad624b",
+      "path": "d:/金融数据/2011-2021年chfs数据/2021",
+      "title": "2021"
+    },
+    {
+      "id": "a535a838b16800f27b7d365c9885f31c061f6788c93ec502c45b07cf4b24d843",
+      "path": "D:\\trae项目\\机械设计软件重构\\连接计算",
+      "title": "连接计算"
+    },
+    {
+      "id": "af676ffadbfb99564ee2ab258ca5e074b9699e77838d9f067513ce0beed32b15",
+      "path": "d:/工作/螺栓应力",
+      "title": "螺栓应力"
+    },
+    {
+      "id": "172bf0be3d325830df3a91eb39eeb1d3d2d8c926bd60f675e2258810bd21737c",
+      "path": "D:\\EXUDYN-master\\main\\pythonDev\\Examples",
+      "title": "Examples"
+    },
+    {
+      "id": "147d053fcf4abbcfe7651a3aa9d6b1b08fa2acf50988ac83615bde59bc6d417b",
+      "path": "d:/工作/notebook",
+      "title": "notebook"
+    },
+    {
+      "id": "0d1c4cefbc61e5b39b1e6b59e2fc77e6428b238c3098233d21d7e85a3dc77296",
+      "path": "d:/工作/电机学习",
+      "title": "电机学习"
+    },
+    {
+      "id": "0465a8241b11d3d05ea5bcda809a32dac3faa96d1c3aaa74b926bd6e404d6d94",
+      "path": "d:/工作/图书skills",
+      "title": "图书skills"
     }
   ]
 }

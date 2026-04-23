@@ -10,6 +10,7 @@ import {
   Plus,
   Eye,
   ExternalLink,
+  FileCode,
   Clipboard,
   Copy,
   Trash2,
@@ -802,6 +803,18 @@ export function DirectoryPanel({
                 <ExternalLink className="mr-2 h-4 w-4" />
                 {t("directoryPanel.openWithDefault", "Open with Default App")}
               </ContextMenuItem>
+              {!node.is_directory &&
+                (node.full_path.toLowerCase().endsWith(".py") ||
+                  node.full_path.toLowerCase().endsWith(".pyw")) && (
+                  <ContextMenuItem
+                    onClick={async () => {
+                      await api.open_with_thonny({ path: node.full_path });
+                    }}
+                  >
+                    <FileCode className="mr-2 h-4 w-4" />
+                    {t("directoryPanel.openWithThonny", "Open with Thonny")}
+                  </ContextMenuItem>
+                )}
               <ContextMenuItem
                 onClick={() => {
                   const targetPath = node.is_directory ? node.full_path : getParentDir(node.full_path);

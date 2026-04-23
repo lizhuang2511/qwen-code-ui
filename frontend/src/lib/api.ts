@@ -47,6 +47,10 @@ const waitForPywebview = (timeout = 500): Promise<void> => {
 
 export interface API {
   check_cli_installed(): Promise<boolean>;
+  is_qwen_installed(): Promise<boolean>;
+  install_qwen(): Promise<{ ok: boolean; installed: boolean; message?: string; error?: string; output?: string }>;
+  is_python_installed(): Promise<boolean>;
+  install_python(): Promise<{ ok: boolean; installed: boolean; message?: string; error?: string; output?: string }>;
   start_session(params: {
     sessionId: string;
     workingDirectory?: string;
@@ -112,6 +116,10 @@ export interface API {
   delete_conversation(params: { chatId: string }): Promise<void>;
   get_canonical_path(params: { path: string }): Promise<string>;
   select_directory(): Promise<string | null>;
+  select_save_file(params: {
+    directory?: string;
+    defaultFilename?: string;
+  }): Promise<string | null>;
   set_title(params: { title: string }): Promise<void>;
   minimize_window(): Promise<void>;
   restore_window(): Promise<void>;
@@ -210,6 +218,7 @@ export interface API {
     error: string | null;
   }>;
   open_with_default_app(params: { path: string }): Promise<void>;
+  open_with_thonny(params: { path: string }): Promise<void>;
   copy_files(params: { paths: string[]; target: string }): Promise<string[]>;
   create_directory(params: { path: string }): Promise<boolean>;
   delete_path(params: { path: string }): Promise<boolean>;
@@ -231,6 +240,13 @@ export interface API {
   add_tag(params: { tag: string }): Promise<string[]>;
   delete_tag(params: { tag: string }): Promise<string[]>;
   toggle_project_tag(params: { projectId: string; tag: string }): Promise<{ tags: string[] }>;
+  get_skills(): Promise<string[]>;
+  add_skill(params: { skill: string }): Promise<string[]>;
+  delete_skill(params: { skill: string }): Promise<string[]>;
+  toggle_project_skill(params: { projectId: string; skill: string }): Promise<{ skills: string[] }>;
+  remove_project_skill(params: { projectId: string; skill: string }): Promise<{ skills: string[] }>;
+  import_project_skills(params: { projectId: string; skills: string[] }): Promise<{ skills: string[] }>;
+  get_skill_content(params: { skill: string; projectPath?: string }): Promise<{ path: string; content: string }>;
   get_qwen_settings(): Promise<any>;
   update_qwen_settings(params: any): Promise<{ ok: boolean; error?: string }>;
   get_ui_settings(): Promise<any>;

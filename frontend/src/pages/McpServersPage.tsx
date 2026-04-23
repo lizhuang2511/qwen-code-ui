@@ -495,6 +495,16 @@ export function McpServersPage() {
           )}
         </div>
 
+        <div className="pt-6 flex justify-center">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/skills")}
+            className="px-10"
+          >
+            {t("skills.title", "Skills 管理")}
+          </Button>
+        </div>
+
         {/* Delete Confirmation Dialog */}
         <Dialog open={!!deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <DialogContent className="max-w-md">

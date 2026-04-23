@@ -36,26 +36,33 @@ export function DiffViewer({
   // Calculate stats by counting lines
   React.useEffect(() => {
     if (onStatsCalculated) {
-      const oldLines = oldText.split("\n");
-      const newLines = newText.split("\n");
-
-      // Simple heuristic for line-based diff stats
-      const additions = Math.max(0, newLines.length - oldLines.length);
-      const deletions = Math.max(0, oldLines.length - newLines.length);
-
-      // For equal line counts, estimate based on character differences
-      if (additions === 0 && deletions === 0) {
-        const oldChars = oldText.length;
-        const newChars = newText.length;
-        const addedChars = Math.max(0, newChars - oldChars);
-        const deletedChars = Math.max(0, oldChars - newChars);
-        onStatsCalculated({
-          additions: Math.ceil(addedChars / 50), // Rough estimate
-          deletions: Math.ceil(deletedChars / 50),
-        });
-      } else {
-        onStatsCalculated({ additions, deletions });
+      if (!oldText && !newText) {
+        onStatsCalculated({ additions: 0, deletions: 0 });
+        return;
       }
+
+      const oldLines = (oldText || "").split("\n");
+      const newLines = (newText || "").split("\n");
+
+      let additions = 0;
+      let deletions = 0;
+      const maxLength = Math.max(oldLines.length, newLines.length);
+      
+      for (let i = 0; i < maxLength; i++) {
+        if (oldLines[i] !== newLines[i]) {
+          if (i < oldLines.length) deletions++;
+          if (i < newLines.length) additions++;
+        }
+      }
+
+      // Fallback if texts are different but our simple line matcher didn't catch it
+      // (e.g. if we only check up to maxLength but there's some weird edge case)
+      if (additions === 0 && deletions === 0 && oldText !== newText) {
+        additions = 1;
+        deletions = 1;
+      }
+
+      onStatsCalculated({ additions, deletions });
     }
   }, [oldText, newText, onStatsCalculated]);
 

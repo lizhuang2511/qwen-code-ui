@@ -5,6 +5,8 @@ import subprocess
 import shutil
 import shlex
 import time
+import tempfile
+import urllib.request
 import events
 import filesystem
 import search
@@ -30,6 +32,85 @@ except ImportError:
     HAS_WIN32 = False
 
 class Api:
+    def _get_app_dir(self) -> str:
+        if getattr(sys, "frozen", False):
+            return os.path.dirname(sys.executable)
+        return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+    def _find_python_runtime_path(self) -> Optional[str]:
+        p = shutil.which("python")
+        if p:
+            return p
+
+        app_dir = self._get_app_dir()
+        local_python = os.path.join(app_dir, "python.exe")
+        if os.path.exists(local_python):
+            return local_python
+
+        candidates: List[str] = []
+        try:
+            local_app_data = os.environ.get("LOCALAPPDATA", "")
+            if local_app_data:
+                candidates.extend(
+                    [
+                        os.path.join(local_app_data, "Programs", "Python"),
+                        os.path.join(local_app_data, "Microsoft", "WindowsApps"),
+                    ]
+                )
+            program_files = os.environ.get("ProgramFiles", "")
+            if program_files:
+                candidates.append(program_files)
+            program_files_x86 = os.environ.get("ProgramFiles(x86)", "")
+            if program_files_x86:
+                candidates.append(program_files_x86)
+        except Exception:
+            pass
+
+        for base in candidates:
+            try:
+                if not base or not os.path.exists(base):
+                    continue
+                for root, dirs, files in os.walk(base):
+                    for fn in files:
+                        if fn.lower() == "python.exe":
+                            return os.path.join(root, fn)
+                    if len(root) - len(base) > 160:
+                        dirs[:] = []
+            except Exception:
+                continue
+
+        return None
+
+    def _find_local_python_installer(self) -> Optional[str]:
+        app_dir = self._get_app_dir()
+        try:
+            if not os.path.exists(app_dir):
+                return None
+            hits: List[str] = []
+            for fn in os.listdir(app_dir):
+                f = fn.lower()
+                if not f.endswith(".exe"):
+                    continue
+                if f in ("python.exe", "pythonw.exe"):
+                    continue
+                if ("python" not in f) and ("pyhon" not in f):
+                    continue
+                full = os.path.join(app_dir, fn)
+                if os.path.isfile(full):
+                    hits.append(full)
+            if not hits:
+                return None
+            hits.sort(
+                key=lambda p: (
+                    0 if os.path.basename(p).lower().startswith("python") else 1,
+                    len(os.path.basename(p)),
+                    os.path.basename(p).lower(),
+                )
+            )
+            return hits[0]
+        except Exception:
+            return None
+
     def get_model_providers(self) -> Dict[str, Any]:
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         model_providers_file = os.path.join(base_dir, "model_providers.json")
@@ -165,6 +246,134 @@ class Api:
                 has_any = True
         return has_any
 
+    def is_qwen_installed(self) -> bool:
+        return shutil.which("qwen") is not None or shutil.which("qwen-code") is not None
+
+    def install_qwen(self) -> Dict[str, Any]:
+        if self.is_qwen_installed():
+            return {"ok": True, "installed": True, "message": "already_installed"}
+
+        url = "https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen.bat"
+        temp_dir = tempfile.gettempdir()
+        ts = int(time.time())
+        bat_path = os.path.join(temp_dir, f"install-qwen-{ts}.bat")
+        try:
+            urllib.request.urlretrieve(url, bat_path)
+        except Exception as e:
+            return {"ok": False, "installed": False, "error": f"download_failed: {e}"}
+
+        try:
+            p = subprocess.run(
+                ["cmd", "/c", bat_path],
+                capture_output=True,
+                text=True,
+                timeout=600,
+                shell=False,
+            )
+            installed = self.is_qwen_installed()
+            if p.returncode == 0 and installed:
+                return {
+                    "ok": True,
+                    "installed": True,
+                    "message": "installed",
+                    "output": (p.stdout or "")[-4000:],
+                }
+            return {
+                "ok": False,
+                "installed": installed,
+                "error": "install_failed",
+                "output": ((p.stdout or "") + "\n" + (p.stderr or ""))[-4000:],
+            }
+        except subprocess.TimeoutExpired:
+            return {"ok": False, "installed": self.is_qwen_installed(), "error": "install_timeout"}
+        except Exception as e:
+            return {"ok": False, "installed": self.is_qwen_installed(), "error": f"install_error: {e}"}
+
+    def is_python_installed(self) -> bool:
+        return self._find_python_runtime_path() is not None
+
+    def install_python(self) -> Dict[str, Any]:
+        if self.is_python_installed():
+            app_dir = self._get_app_dir()
+            local_python = os.path.join(app_dir, "python.exe")
+            if os.path.exists(local_python):
+                return {
+                    "ok": True,
+                    "installed": True,
+                    "message": "local_python",
+                    "output": local_python,
+                }
+            return {"ok": True, "installed": True, "message": "already_installed"}
+
+        if os.name != "nt":
+            return {"ok": False, "installed": False, "error": "unsupported_platform"}
+
+        local_installer = self._find_local_python_installer()
+        if local_installer:
+            try:
+                p = subprocess.run(
+                    [
+                        local_installer,
+                        "/quiet",
+                        "InstallAllUsers=1",
+                        "PrependPath=1",
+                        "Include_test=0",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=1800,
+                    shell=False,
+                )
+                runtime = self._find_python_runtime_path()
+                out = ((p.stdout or "") + "\n" + (p.stderr or ""))[-4000:]
+                if runtime:
+                    return {
+                        "ok": True,
+                        "installed": True,
+                        "message": "installed_from_local_installer",
+                        "output": f"{local_installer}\n{runtime}\n{out}".strip(),
+                    }
+                return {
+                    "ok": False,
+                    "installed": False,
+                    "error": "local_installer_failed",
+                    "output": f"{local_installer}\n{out}".strip(),
+                }
+            except subprocess.TimeoutExpired:
+                return {"ok": False, "installed": self.is_python_installed(), "error": "install_timeout"}
+            except Exception as e:
+                return {"ok": False, "installed": self.is_python_installed(), "error": f"install_error: {e}"}
+
+        winget = shutil.which("winget")
+        if winget is None:
+            return {"ok": False, "installed": False, "error": "winget_not_found"}
+
+        try:
+            p = subprocess.run(
+                [
+                    winget,
+                    "install",
+                    "-e",
+                    "--id",
+                    "Python.Python.3.12",
+                    "--accept-package-agreements",
+                    "--accept-source-agreements",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=1800,
+                shell=False,
+            )
+            installed = self.is_python_installed()
+            out = ((p.stdout or "") + "\n" + (p.stderr or ""))[-4000:]
+            if installed:
+                return {"ok": True, "installed": True, "message": "installed", "output": out}
+            return {"ok": False, "installed": False, "error": "install_failed", "output": out}
+        except subprocess.TimeoutExpired:
+            return {"ok": False, "installed": self.is_python_installed(), "error": "install_timeout"}
+        except Exception as e:
+            return {"ok": False, "installed": self.is_python_installed(), "error": f"install_error: {e}"}
+
     def start_session(self, params: Dict[str, Any]) -> None:
         session_id = params.get("sessionId", "")
         working_directory = params.get("workingDirectory")
@@ -195,8 +404,8 @@ class Api:
         outcome = params.get("outcome", "")
         
         # Determine status based on outcome
-        # Covers "proceed_once", "proceed_always", etc.
-        is_approved = outcome.startswith("proceed") or outcome.startswith("allow")
+        # Covers "proceed_once", "proceed_always", "option_0", etc.
+        is_approved = outcome.startswith("proceed") or outcome.startswith("allow") or outcome in ("option_0", "option_1", "option_2")
         
         status = "completed" if is_approved else "failed"
         result = "Permission granted" if is_approved else "Permission denied"
@@ -365,6 +574,28 @@ class Api:
             return result[0] if len(result) > 0 else None
         return str(result) if result else None
 
+    def select_save_file(self, params: Dict[str, Any]) -> Optional[str]:
+        directory = params.get("directory", None)
+        default_filename = params.get("defaultFilename", None)
+        wins = getattr(webview, "windows", [])
+        dialog_kwargs: Dict[str, Any] = {}
+        if directory:
+            dialog_kwargs["directory"] = directory
+        if default_filename:
+            dialog_kwargs["save_filename"] = default_filename
+        dialog_kwargs["file_types"] = ("Text Files (*.txt)", "All Files (*.*)")
+
+        result = None
+        if wins and len(wins) > 0:
+            result = wins[0].create_file_dialog(webview.SAVE_DIALOG, allow_multiple=False, **dialog_kwargs)
+        else:
+            result = webview.create_file_dialog(webview.SAVE_DIALOG, allow_multiple=False, **dialog_kwargs)
+        if result is None:
+            return None
+        if isinstance(result, (list, tuple)):
+            return result[0] if len(result) > 0 else None
+        return str(result) if result else None
+
     def set_title(self, params: Dict[str, Any]) -> None:
         title = params.get("title", "")
         wins = getattr(webview, "windows", [])
@@ -401,6 +632,36 @@ class Api:
                 subprocess.call(('open', path))
             else:
                 subprocess.call(('xdg-open', path))
+
+    def open_with_thonny(self, params: Dict[str, Any]) -> None:
+        path = params.get("path", "")
+        if not path:
+            raise ValueError("path is required")
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"File not found: {path}")
+        if os.path.isdir(path):
+            raise IsADirectoryError(f"Expected file, got directory: {path}")
+
+        try:
+            import thonny  # noqa: F401
+        except Exception as e:
+            raise RuntimeError(f"Thonny 未安装（pip install thonny）。详细：{e}") from e
+
+        try:
+            creationflags = 0
+            if sys.platform == "win32":
+                creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+
+            subprocess.Popen(
+                [sys.executable, "-m", "thonny", path],
+                cwd=os.path.dirname(path) or None,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                creationflags=creationflags,
+            )
+        except Exception as e:
+            raise RuntimeError(f"启动 Thonny 失败：{e}") from e
 
     def copy_files(self, params: Dict[str, Any]) -> List[str]:
         return filesystem.copy_files(params.get("paths", []), params.get("target", ""))
@@ -1041,3 +1302,31 @@ class Api:
 
     def toggle_project_tag(self, params: Dict[str, Any]) -> Dict[str, Any]:
         return projects.toggle_project_tag(params.get("projectId", ""), params.get("tag", ""))
+
+    def get_skills(self) -> List[str]:
+        return projects.get_all_skills()
+
+    def add_skill(self, params: Dict[str, Any]) -> List[str]:
+        return projects.add_skill(params.get("skill", ""))
+
+    def delete_skill(self, params: Dict[str, Any]) -> List[str]:
+        return projects.delete_skill(params.get("skill", ""))
+
+    def toggle_project_skill(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        return projects.toggle_project_skill(params.get("projectId", ""), params.get("skill", ""))
+
+    def remove_project_skill(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        return projects.remove_project_skill(params.get("projectId", ""), params.get("skill", ""))
+
+    def import_project_skills(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        skills = params.get("skills", [])
+        if skills is None:
+            skills = []
+        if not isinstance(skills, list):
+            skills = [skills]
+        return projects.import_project_skills(params.get("projectId", ""), skills)
+
+    def get_skill_content(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        skill = params.get("skill", "")
+        project_path = params.get("projectPath", "") or params.get("project_path", "")
+        return projects.get_skill_content(skill, project_path or "")

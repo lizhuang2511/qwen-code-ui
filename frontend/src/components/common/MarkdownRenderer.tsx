@@ -75,7 +75,7 @@ export function MarkdownRenderer({ children, isAssistant = false, fontSize }: { 
               return <CodeBlock code={content.trim()} language={language} />;
             } else {
               // Render as inline code
-              return <Code>{children}</Code>;
+              return <Code className="break-all">{children}</Code>;
             }
           },
           a: ({ href, children, ...props }) => (

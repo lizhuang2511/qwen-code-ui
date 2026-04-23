@@ -71,9 +71,41 @@
       "title": "MCP Servers",
       "description": "Manage MCP configuration and settings."
     },
+    "skillsCard": {
+      "title": "Skills",
+      "description": "Aggregate skills and import into projects."
+    },
+    "installQwen": "Install Qwen",
+    "installPython": "Install Python",
     "recentChats": {
       "title": "Recent Conversations"
     }
+  },
+
+  "qwenInstall": {
+    "title": "Install Qwen Code",
+    "installed": "Installed",
+    "installing": "Installing…",
+    "checking": "Checking…",
+    "failed": "Install failed",
+    "retry": "Re-check / Install",
+    "nextStep": "Next: Key & Config"
+  },
+
+  "pythonInstall": {
+    "title": "Install Python",
+    "installed": "Installed",
+    "downloading": "Downloading…",
+    "installing": "Installing…",
+    "checking": "Checking…",
+    "failed": "Install failed",
+    "retry": "Re-check / Install"
+  },
+
+  "skills": {
+    "tabContent": "Content",
+    "tabProjects": "Projects",
+    "noContent": "No content found for this skill"
   },
 
   "titleBar": {
@@ -129,6 +161,11 @@
     "export": "Copy Categories",
     "exportSuccess": "Copied to clipboard successfully",
     "exportFailed": "Failed to copy to clipboard",
+    "saveToCurrentDir": "Save to current folder",
+    "saveAs": "Save As",
+    "exportSavedTo": "Saved to {{path}}",
+    "exportSaveFailed": "Failed to save",
+    "exportDefaultFileName": "categories.txt",
     "manageTags": "Manage Tags",
     "manageTagsDesc": "Select a tag to filter projects. Right-click to delete.",
     "newTagName": "New Tag Name",
@@ -565,7 +602,9 @@
   "directoryPanel": {
     "title": "Directory",
     "noContent": "No directory content",
-    "openInFileManager": "Open in File Manager"
+    "openInFileManager": "Open in File Manager",
+    "openWithDefault": "Open with Default App",
+    "openWithThonny": "Open with Thonny"
   },
 
   "newChatPlaceholder": {

@@ -7,6 +7,7 @@ export interface MenuHandler {
   goHome: () => void;
   goProjects: () => void;
   goMcpServers: () => void;
+  goSkills: () => void;
   openSettings: () => void;
   toggleTheme: () => void;
   refresh: () => void;
@@ -58,6 +59,11 @@ export const getMenuShortcuts = (): Record<
       [modifierKey]: true,
       display: `${displayModifier}M`,
     },
+    goSkills: {
+      key: "k",
+      [modifierKey]: true,
+      display: `${displayModifier}K`,
+    },
     openSettings: {
       key: ",",
       [modifierKey]: true,
@@ -77,6 +83,7 @@ export const createMenuHandlers = (
   goHome: () => navigate("/"),
   goProjects: () => navigate("/projects"),
   goMcpServers: () => navigate("/mcp"),
+  goSkills: () => navigate("/skills"),
   openSettings: () => {
     // Broadcast an app-wide event to open the Settings dialog
     try {
@@ -111,6 +118,7 @@ export const getMenuLabels = (
     home: t("titleBar.home"),
     projects: t("titleBar.projects"),
     mcpServers: t("titleBar.mcpServers"),
+    skills: t("titleBar.skills"),
     toggleDarkMode: t("titleBar.toggleDarkMode"),
     refresh: t("titleBar.refresh"),
     about: t("titleBar.about", { name: backendText.desktopName }),

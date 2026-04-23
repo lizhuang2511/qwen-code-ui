@@ -152,10 +152,25 @@ export function EditRenderer({
         editInfo.newText
       ) {
         // Calculate rough counts based on line differences
-        const oldLines = editInfo.oldText.split("\n").length;
-        const newLines = editInfo.newText.split("\n").length;
-        const additions = Math.max(0, newLines - oldLines);
-        const deletions = Math.max(0, oldLines - newLines);
+        const oldLines = editInfo.oldText.split("\n");
+        const newLines = editInfo.newText.split("\n");
+        
+        let additions = 0;
+        let deletions = 0;
+        const maxLength = Math.max(oldLines.length, newLines.length);
+        
+        for (let i = 0; i < maxLength; i++) {
+          if (oldLines[i] !== newLines[i]) {
+            if (i < oldLines.length) deletions++;
+            if (i < newLines.length) additions++;
+          }
+        }
+
+        if (additions === 0 && deletions === 0 && editInfo.oldText !== editInfo.newText) {
+          additions = 1;
+          deletions = 1;
+        }
+
         return { additions, deletions };
       }
       return { additions: editInfo.additions, deletions: editInfo.deletions };
@@ -167,7 +182,9 @@ export function EditRenderer({
     }
   };
 
-  getTotalChanges();
+  const displayStats = diffStats.additions > 0 || diffStats.deletions > 0 
+    ? diffStats 
+    : getTotalChanges();
 
   return (
     <div className="my-4">
@@ -215,10 +232,10 @@ export function EditRenderer({
                         : "(multiple files)"}
                       <span className="ml-2 text-xs font-normal text-muted-foreground">
                         <span className="text-green-600 dark:text-green-400">
-                          +{diffStats.additions}
+                          +{displayStats.additions}
                         </span>{" "}
                         <span className="text-red-600 dark:text-red-400">
-                          -{diffStats.deletions}
+                          -{displayStats.deletions}
                         </span>
                       </span>
                     </CardTitle>
