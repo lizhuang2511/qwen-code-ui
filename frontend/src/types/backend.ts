@@ -27,6 +27,9 @@ export interface QwenConfig {
   useOAuth: boolean;
   yolo?: boolean;
   enableThinking?: boolean;
+  temperature?: number;
+  maxTokens?: number;
+  timeoutMs?: number;
 }
 
 // Provider names as union type for type safety

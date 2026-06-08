@@ -22,6 +22,8 @@ export const defaultQwenConfig: QwenConfig = {
   model: "qwen-max",
   useOAuth: true,
   enableThinking: false,
+  temperature: 0.5,
+  maxTokens: 4096,
 };
 
 export const defaultLLxprtConfig: LLxprtConfig = {

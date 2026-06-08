@@ -293,6 +293,18 @@ def api_toggle_tag(req: ToggleTagRequest) -> Dict[str, Any]:
 def api_get_skills() -> List[str]:
     return projects.get_all_skills()
 
+@app.get("/api/skills/search")
+def api_search_skills(q: str, mode: str = "all", projectPath: str = "", limit: int = 200) -> List[Dict[str, Any]]:
+    return projects.search_skills(q, mode, projectPath, limit)
+
+class ResolveSkillFoldersRequest(BaseModel):
+    skills: List[str]
+    projectPath: str = ""
+
+@app.post("/api/skills/resolve-folders")
+def api_resolve_skill_folders(req: ResolveSkillFoldersRequest) -> List[str]:
+    return projects.resolve_skill_folders(req.skills, req.projectPath)
+
 class SkillRequest(BaseModel):
     skill: str
 

@@ -16,13 +16,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { Send, Info, Play, Loader2, X, Paperclip, FileText } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import {
+  Send,
+  Info,
+  Play,
+  Loader2,
+  X,
+  Paperclip,
+  FileText,
+  MessageCircle,
+} from "lucide-react";
 import { useBackend } from "../../contexts/BackendContext";
 import { getBackendText } from "../../utils/backendText";
 import { CliIO } from "../../types";
 
 import { useMessageTimer } from "../../hooks/useMessageTimer";
 import { useWittyLoadingPhrase } from "../../hooks/useWittyLoadingPhrase";
+import commonPhrases from "../../assets/commonPhrases.json";
+
+type CommonPhrase = {
+  abbr: string;
+  content: string;
+};
+
+const commonPhrasesList = commonPhrases as CommonPhrase[];
 
 interface MessageInputBarProps {
   input: string;
@@ -260,6 +283,33 @@ export const MessageInputBar = forwardRef<
             >
               <Send />
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  disabled={isCliInstalled === false}
+                  size="icon"
+                  variant="outline"
+                  title={t("messageInput.commonPhrases")}
+                >
+                  <MessageCircle className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[220px]">
+                {commonPhrasesList.map((phrase) => (
+                  <DropdownMenuItem
+                    key={phrase.abbr}
+                    className="cursor-pointer"
+                    onSelect={() => {
+                      mentionInputRef.current?.closeDropdown();
+                      mentionInputRef.current?.insertMention(phrase.content);
+                    }}
+                  >
+                    {phrase.abbr}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Dialog>
               <DialogTrigger asChild>
                 <Button

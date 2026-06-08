@@ -20,7 +20,11 @@ export const useToolCallConfirmation = ({
   >(new Map());
 
   const handleConfirmToolCall = useCallback(
-    async (toolCallId: string, outcome: string) => {
+    async (
+      toolCallId: string,
+      outcome: string,
+      extra?: { answers?: Record<string, unknown> }
+    ) => {
       const confirmationRequest = confirmationRequests.get(toolCallId);
       if (!confirmationRequest) {
         console.error(
@@ -37,7 +41,12 @@ export const useToolCallConfirmation = ({
           requestId: confirmationRequest.requestId,
           toolCallId: toolCallId,
           outcome,
+          answers: extra?.answers,
         });
+
+        if (outcome === "questionnaire_draft") {
+          return;
+        }
 
         // If approved, update the tool call status in the UI
         if (
@@ -46,7 +55,8 @@ export const useToolCallConfirmation = ({
           outcome.startsWith("allow") ||
           outcome === "option_0" ||
           outcome === "option_1" ||
-          outcome === "option_2"
+          outcome === "option_2" ||
+          outcome === "questionnaire_submit"
         ) {
           updateConversation(activeConversation!, (conv) => {
             let found = false;
@@ -59,7 +69,8 @@ export const useToolCallConfirmation = ({
                   // PRESERVE the confirmation request data when changing status
                   const preservedConfirmationRequest =
                     msgPart.toolCall.confirmationRequest || confirmationRequest;
-                  msgPart.toolCall.status = "running";
+                  msgPart.toolCall.status =
+                    outcome === "questionnaire_submit" ? "completed" : "running";
                   msgPart.toolCall.confirmationRequest =
                     preservedConfirmationRequest;
                   found = true;
@@ -104,12 +115,13 @@ export const useToolCallConfirmation = ({
           });
         }
 
-        // Remove the confirmation request from the map
-        setConfirmationRequests((prev) => {
-          const newMap = new Map(prev);
-          newMap.delete(toolCallId);
-          return newMap;
-        });
+        if (outcome !== "questionnaire_draft") {
+          setConfirmationRequests((prev) => {
+            const newMap = new Map(prev);
+            newMap.delete(toolCallId);
+            return newMap;
+          });
+        }
       } catch (error) {
         console.error("Failed to send tool call confirmation:", error);
       }

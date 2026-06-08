@@ -33,6 +33,7 @@ class ToolConfirmationRequest(BaseModel):
     requestId: int
     toolCallId: str
     outcome: str
+    answers: Optional[Dict[str, Any]] = None
 
 class CommandRequest(BaseModel):
     command: str
@@ -87,6 +88,14 @@ def python_installed():
 def install_python():
     return backend_api.install_python()
 
+@router.get("/create-temp-workspace")
+def create_temp_workspace():
+    return backend_api.create_temp_workspace()
+
+@router.post("/create-directory")
+def create_directory(req: PathRequest):
+    return backend_api.create_directory({"path": req.path})
+
 @router.post("/kill-process")
 def kill_process(req: ConversationIdRequest):
     backend_api.kill_process({"conversationId": req.conversationId})
@@ -98,9 +107,34 @@ def tool_confirmation(req: ToolConfirmationRequest):
         "sessionId": req.sessionId,
         "requestId": req.requestId,
         "toolCallId": req.toolCallId,
-        "outcome": req.outcome
+        "outcome": req.outcome,
+        "answers": req.answers,
     })
     return {"ok": True}
+
+
+class QuestionnaireCreateRequest(BaseModel):
+    sessionId: str
+    toolCallId: Optional[str] = None
+    title: str
+    questions: List[Dict[str, Any]]
+    draftAnswers: Optional[Dict[str, Any]] = None
+
+
+@router.post("/questionnaires/create")
+def questionnaire_create(req: QuestionnaireCreateRequest):
+    return backend_api.create_questionnaire({
+        "sessionId": req.sessionId,
+        "toolCallId": req.toolCallId,
+        "title": req.title,
+        "questions": req.questions,
+        "draftAnswers": req.draftAnswers,
+    })
+
+
+@router.get("/questionnaires/pending")
+def questionnaire_pending(sessionId: str):
+    return backend_api.get_pending_questionnaires({"sessionId": sessionId})
 
 @router.post("/execute-command")
 def execute_command(req: CommandRequest):
@@ -275,6 +309,10 @@ def open_qwen_settings_in_editor():
 @router.post("/open-qwen-folder")
 def open_qwen_folder():
     return backend_api.open_qwen_folder()
+
+@router.post("/open-global-skills-folder")
+def open_global_skills_folder():
+    return backend_api.open_global_skills_folder()
 
 @router.post("/open-model-providers-json")
 def open_model_providers_json():

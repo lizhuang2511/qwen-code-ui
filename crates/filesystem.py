@@ -6,6 +6,13 @@ from typing import List, Dict, Optional
 from datetime import datetime
 import backend.git_utils as git_utils
 
+def _normalize_path(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (list, tuple)):
+        return _normalize_path(value[0]) if len(value) > 0 else ""
+    return str(value)
+
 def get_home_directory() -> str:
     return str(Path.home())
 
@@ -96,6 +103,7 @@ def list_directory_contents(path: str) -> List[Dict]:
     return entries
 
 def read_file_content(path: str) -> Dict:
+    path = _normalize_path(path)
     # 修复大模型生成的路径中可能包含的异常空格（例如中英文交界处的空格）
     import re
     if path:
@@ -136,6 +144,7 @@ def read_file_content(path: str) -> Dict:
     }
 
 def read_binary_file_as_base64(path: str) -> str:
+    path = _normalize_path(path)
     import re
     p = Path(path)
     if not p.exists():
@@ -147,6 +156,7 @@ def read_binary_file_as_base64(path: str) -> str:
     return base64.b64encode(data).decode("ascii")
 
 def write_file_content(path: str, content: str) -> Dict:
+    path = _normalize_path(path)
     import re
     p = Path(path)
     if not p.exists() and not p.parent.exists():
@@ -171,6 +181,8 @@ def write_file_content(path: str, content: str) -> Dict:
     return read_file_content(str(p))
 
 def write_binary_file_content(path: str, base64_content: str) -> Dict:
+    path = _normalize_path(path)
+    base64_content = _normalize_path(base64_content)
     import re
     p = Path(path)
     if not p.exists() and not p.parent.exists():

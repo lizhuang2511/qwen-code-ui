@@ -11,6 +11,7 @@ from datetime import datetime
 import events
 import projects
 import watcher
+import questionnaires
 from cli_runner import build_client, build_command, resolve_executable, STREAM_LIMIT_BYTES, LINE_LIMIT_BYTES
 from parsers import parse_qwen_line
 from qwen_adapter import QwenProcess
@@ -20,8 +21,268 @@ DATA_DIR = BASE_DIR / "data"
 PROJECTS_DIR = DATA_DIR / "projects"
 # Default project ID for single-project mode
 DEFAULT_PROJECT_ID = "default"
+DEFAULT_CLI_IDLE_TIMEOUT_SECONDS = int(os.getenv("QWENCODE_CLI_IDLE_TIMEOUT_SECONDS", "172800") or "172800")
 
 _sessions: Dict[str, Dict] = {}
+
+ASK_JSON_BEGIN = "[[ASK_JSON_BEGIN]]"
+ASK_JSON_END = "[[ASK_JSON_END]]"
+
+
+def _split_by_ask_json_markers(session_id: str, text: str) -> List[Dict[str, Any]]:
+    sid = (session_id or "").strip()
+    if not sid:
+        return [{"type": "text", "text": text or ""}]
+
+    s = _sessions.get(sid, {})
+    state = s.get("ask_json_state")
+    if not isinstance(state, dict):
+        state = {"in_progress": False, "buf": ""}
+        s["ask_json_state"] = state
+
+    out: List[Dict[str, Any]] = []
+    cur = text or ""
+    while True:
+        if not cur:
+            break
+
+        if state.get("in_progress"):
+            state["buf"] = (state.get("buf") or "") + cur
+            buf = state.get("buf") or ""
+            end_idx = buf.find(ASK_JSON_END)
+            if end_idx == -1:
+                cur = ""
+                break
+
+            json_str = buf[:end_idx].strip()
+            remainder = buf[end_idx + len(ASK_JSON_END) :]
+            state["buf"] = ""
+            state["in_progress"] = False
+
+            payload = None
+            if json_str:
+                try:
+                    obj = json.loads(json_str)
+                    if isinstance(obj, dict) and isinstance(obj.get("questions"), list):
+                        payload = obj
+                except Exception:
+                    payload = None
+
+            if payload:
+                out.append({"type": "ask", "payload": payload})
+
+            cur = remainder
+            continue
+
+        begin_idx = cur.find(ASK_JSON_BEGIN)
+        if begin_idx == -1:
+            out.append({"type": "text", "text": cur})
+            cur = ""
+            break
+
+        if begin_idx > 0:
+            out.append({"type": "text", "text": cur[:begin_idx]})
+
+        state["in_progress"] = True
+        state["buf"] = ""
+        cur = cur[begin_idx + len(ASK_JSON_BEGIN) :]
+
+    _sessions[sid] = s
+    return out
+
+
+def _format_questionnaire_answers(payload: Dict[str, Any], answers: Dict[str, Any]) -> str:
+    title = (payload.get("title") or "问答").strip()
+    questions = payload.get("questions") or []
+    lines: List[str] = [
+        f"以下是用户对问答《{title}》的回答，请严格按这些回答继续后续任务：",
+        "",
+    ]
+    for q in questions:
+        if not isinstance(q, dict):
+            continue
+        qid = q.get("id")
+        if not isinstance(qid, str) or not qid:
+            continue
+        label = (q.get("label") or qid).strip()
+        qtype = q.get("type")
+        raw = answers.get(qid)
+
+        val = ""
+        if qtype in ("single", "multi"):
+            opts = q.get("options") or []
+            opt_map = {}
+            if isinstance(opts, list):
+                for opt in opts:
+                    if isinstance(opt, dict) and isinstance(opt.get("id"), str):
+                        opt_map[opt["id"]] = str(opt.get("label") or opt["id"])
+
+            if qtype == "single":
+                if isinstance(raw, str):
+                    val = opt_map.get(raw, raw)
+            else:
+                if isinstance(raw, list):
+                    vals: List[str] = []
+                    for it in raw:
+                        if isinstance(it, str):
+                            vals.append(opt_map.get(it, it))
+                    val = "、".join([v for v in vals if v])
+        else:
+            if raw is None:
+                val = ""
+            elif isinstance(raw, str):
+                val = raw
+            else:
+                try:
+                    val = json.dumps(raw, ensure_ascii=False)
+                except Exception:
+                    val = str(raw)
+
+        lines.append(f"- {qid}（{label}）: {val}")
+
+    return "\n".join(lines).strip()
+
+
+def _emit_assistant_text(session_id: str, text: str) -> None:
+    if not text:
+        return
+    events.emit(f"ai-output-{session_id}", text)
+    logger = _get_logger(session_id)
+    if logger:
+        payload = {
+            "method": "session/update",
+            "params": {"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": text}}},
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }
+        logger.log(payload)
+    events.emit(f"ai-turn-finished-{session_id}", True)
+
+
+def _wait_for_user_text(session_id: str) -> str:
+    sess = _sessions.get(session_id, {})
+    waiter = sess.get("user_text_waiter")
+    if isinstance(waiter, dict) and isinstance(waiter.get("event"), threading.Event) and not waiter.get("event").is_set():
+        return ""
+
+    waiter = {"event": threading.Event(), "value": None}
+    sess["user_text_waiter"] = waiter
+    _sessions[session_id] = sess
+
+    while True:
+        if waiter["event"].wait(0.25):
+            break
+        s = _sessions.get(session_id, {})
+        if not s.get("alive", True):
+            break
+
+    s = _sessions.get(session_id, {})
+    if s.get("user_text_waiter") is waiter:
+        del s["user_text_waiter"]
+        _sessions[session_id] = s
+
+    val = waiter.get("value")
+    return val if isinstance(val, str) else ""
+
+
+def _parse_single_choice_answer(raw: str, options: List[Dict[str, Any]]) -> Optional[str]:
+    s = (raw or "").strip()
+    if not s:
+        return None
+    if s.isdigit():
+        idx = int(s)
+        if 1 <= idx <= len(options):
+            opt = options[idx - 1]
+            oid = opt.get("id")
+            return oid if isinstance(oid, str) and oid else None
+        return None
+    for opt in options:
+        oid = opt.get("id")
+        label = opt.get("label")
+        if isinstance(oid, str) and oid and s == oid:
+            return oid
+        if isinstance(label, str) and label and s == label:
+            return oid if isinstance(oid, str) and oid else None
+    return None
+
+
+def _parse_multi_choice_answer(raw: str, options: List[Dict[str, Any]]) -> Optional[List[str]]:
+    s = (raw or "").strip()
+    if not s:
+        return None
+    parts = [p.strip() for p in s.replace("，", ",").split(",") if p.strip()]
+    if not parts:
+        return None
+    picked: List[str] = []
+    for p in parts:
+        oid = _parse_single_choice_answer(p, options)
+        if oid and oid not in picked:
+            picked.append(oid)
+    return picked if picked else None
+
+
+def _run_text_questionnaire(session_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    title = (payload.get("title") or "问答").strip()
+    questions = payload.get("questions") or []
+    answers: Dict[str, Any] = {}
+
+    _emit_assistant_text(session_id, f"\n\n【需要你回答几个问题：{title}】\n")
+
+    for q in questions:
+        if not isinstance(q, dict):
+            continue
+        qid = q.get("id")
+        if not isinstance(qid, str) or not qid:
+            continue
+        qtype = (q.get("type") or "text").strip()
+        label = (q.get("label") or qid).strip()
+        required = bool(q.get("required", False))
+        options = q.get("options") or []
+        opt_list: List[Dict[str, Any]] = [o for o in options if isinstance(o, dict)]
+
+        while True:
+            prompt_lines: List[str] = [f"{label}{'（必填）' if required else ''}"]
+            if qtype in ("single", "multi") and opt_list:
+                for i, opt in enumerate(opt_list):
+                    lab = opt.get("label") or opt.get("id") or ""
+                    prompt_lines.append(f"{i + 1}. {lab}")
+                if qtype == "single":
+                    prompt_lines.append("回复一个序号（如 1）")
+                else:
+                    prompt_lines.append("可多选，回复序号列表（如 1,3,4）")
+            else:
+                prompt_lines.append("直接回复你的答案")
+
+            _emit_assistant_text(session_id, "\n".join(prompt_lines) + "\n")
+
+            user_raw = _wait_for_user_text(session_id)
+            user_raw = (user_raw or "").strip()
+            if not user_raw:
+                if required:
+                    _emit_assistant_text(session_id, "该问题为必填，请再回答一次。\n")
+                    continue
+                answers[qid] = ""
+                break
+
+            if qtype == "single":
+                oid = _parse_single_choice_answer(user_raw, opt_list)
+                if oid is None:
+                    _emit_assistant_text(session_id, "未识别你的选择，请按序号回复（如 1）。\n")
+                    continue
+                answers[qid] = oid
+                break
+
+            if qtype == "multi":
+                oids = _parse_multi_choice_answer(user_raw, opt_list)
+                if oids is None:
+                    _emit_assistant_text(session_id, "未识别你的选择，请按序号列表回复（如 1,3）。\n")
+                    continue
+                answers[qid] = oids
+                break
+
+            answers[qid] = user_raw
+            break
+
+    return answers
 
 class RpcLogger:
     def __init__(self, session_id: str, project_id: str = DEFAULT_PROJECT_ID):
@@ -198,6 +459,7 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
             now = int(time.time())
             s = _sessions.get(session_id, {})
             s["last_output_at"] = now
+            s["last_activity_at"] = now
             _sessions[session_id] = s
             if backend == "qwen":
                 # print(f"[SESSION-RAW] {ln[:100]}") # Debug raw input
@@ -372,15 +634,33 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
 
                     content = parsed.get("content", "")
                     if content:
-                        ui_buffer.append(content)
-                        # Flush if buffer is getting large or time has passed
-                        if time.time() - last_emit_time > 0.05 or len("".join(ui_buffer)) > 50:
-                            flush_ui_buffer()
-                        
-                        # Buffer assistant message chunk for logging
-                        log_buffer.append(content)
-                        if len("".join(log_buffer)) > 100:
-                            flush_log_buffer()
+                        parts = _split_by_ask_json_markers(session_id, content)
+                        for part in parts:
+                            if part.get("type") == "ask":
+                                payload = part.get("payload")
+                                if not isinstance(payload, dict):
+                                    continue
+                                flush_ui_buffer()
+                                flush_thought_buffer()
+                                flush_log_buffer()
+                                flush_thought_log_buffer()
+                                answers = _run_text_questionnaire(session_id, payload)
+                                msg = _format_questionnaire_answers(payload, answers)
+                                if msg:
+                                    send_message(session_id, msg, None)
+                                continue
+
+                            txt_part = part.get("text") or ""
+                            if not txt_part:
+                                continue
+
+                            ui_buffer.append(txt_part)
+                            if time.time() - last_emit_time > 0.05 or len("".join(ui_buffer)) > 50:
+                                flush_ui_buffer()
+
+                            log_buffer.append(txt_part)
+                            if len("".join(log_buffer)) > 100:
+                                flush_log_buffer()
             else:
                 events.emit(f"cli-io-{session_id}", {"type": "output", "data": ln})
             if total >= STREAM_LIMIT_BYTES:
@@ -399,6 +679,7 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
             now = int(time.time())
             s = _sessions.get(session_id, {})
             s["last_error_at"] = now
+            s["last_activity_at"] = now
             _sessions[session_id] = s
             print(f"[SESSION-STDERR] {ln}")
             events.emit(f"cli-io-{session_id}", {"type": "output", "data": ln})
@@ -406,11 +687,19 @@ def _start_readers(session_id: str, proc: subprocess.Popen, backend: str, timeou
                 events.emit(f"cli-io-{session_id}", {"type": "output", "data": "[limit] stderr truncated"})
                 break
     def monitor():
+        if timeout_seconds <= 0:
+            return
         while True:
             s = _sessions.get(session_id, {})
             if not s.get("alive"):
                 break
-            last = s.get("last_output_at") or s.get("last_error_at") or 0
+            if isinstance(s.get("questionnaire_waiters"), dict) and s["questionnaire_waiters"]:
+                time.sleep(1)
+                continue
+            if isinstance(s.get("pending_permissions"), dict) and s["pending_permissions"]:
+                time.sleep(1)
+                continue
+            last = s.get("last_activity_at") or s.get("last_output_at") or s.get("last_error_at") or 0
             now = int(time.time())
             if last > 0 and now - last >= timeout_seconds:
                 events.emit(f"process-timeout-{session_id}", {"timeoutSeconds": timeout_seconds})
@@ -479,6 +768,7 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
         "backend": backend or "",
         "last_output_at": 0,
         "last_error_at": 0,
+        "last_activity_at": int(time.time()),
         "ready": False,
         "msg_queue": [],
         "history": [],
@@ -576,7 +866,10 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
         _sessions[session_id]["alive"] = True
         events.emit("process-status-changed", get_process_statuses())
         
-        _start_readers(session_id, proc, backend_name, 1800)
+        idle_timeout_seconds = DEFAULT_CLI_IDLE_TIMEOUT_SECONDS
+        if backend_config and isinstance(backend_config.get("idleTimeoutSeconds"), int):
+            idle_timeout_seconds = backend_config["idleTimeoutSeconds"]
+        _start_readers(session_id, proc, backend_name, idle_timeout_seconds)
         
         events.emit(f"cli-io-{session_id}", {"type": "output", "data": "[session] started cli (stateless adapter)"})
         events.emit(f"process-started-{session_id}", {"pid": proc.pid})
@@ -708,6 +1001,15 @@ def start_session(session_id: str, working_directory: Optional[str], model: Opti
 
 def send_message(session_id: str, message: str, images: list = None) -> None:
     sess = _sessions.get(session_id, {})
+    waiter = sess.get("user_text_waiter")
+    if isinstance(waiter, dict) and isinstance(waiter.get("event"), threading.Event) and not waiter.get("event").is_set():
+        waiter["value"] = message or ""
+        waiter["event"].set()
+        return
+
+    now = int(time.time())
+    sess["last_activity_at"] = now
+    _sessions[session_id] = sess
     events.emit(f"cli-io-{session_id}", {"type": "input", "data": message})
     
     # Log user message (session/prompt)
@@ -784,6 +1086,26 @@ def get_process_statuses():
         })
     return items
 
+def get_working_directory(session_id: str) -> Optional[str]:
+    sid = (session_id or "").strip()
+    if not sid:
+        return None
+
+    s = _sessions.get(sid)
+    if s:
+        wd = s.get("working_directory")
+        if isinstance(wd, str) and wd:
+            return os.path.abspath(wd)
+
+    for _, sess_data in _sessions.items():
+        proc = sess_data.get("proc")
+        if proc and hasattr(proc, "session_id") and proc.session_id == sid:
+            wd = sess_data.get("working_directory")
+            if isinstance(wd, str) and wd:
+                return os.path.abspath(wd)
+
+    return None
+
 def kill_process(conversation_id: str) -> None:
     s = _sessions.get(conversation_id)
     if s:
@@ -831,6 +1153,9 @@ def handle_permission_response(session_id: str, tool_call_id: str, outcome: str)
     if not s.get("alive"):
         print(f"[SESSION] Session {session_id} is marked as dead")
         return
+
+    s["last_activity_at"] = int(time.time())
+    _sessions[session_id] = s
     
     # Resolve toolCallId to request_id
     pending = s.get("pending_permissions", {})
@@ -891,3 +1216,101 @@ def handle_permission_response(session_id: str, tool_call_id: str, outcome: str)
                    }
                    proc.send_response(req_id, result)
                    print(f"[SESSION] 后端: 已完成发送响应到适配器 (result={json.dumps(result)})")
+
+
+def create_questionnaire(session_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    sid = (session_id or "").strip()
+    if not sid:
+        raise ValueError("missing session_id")
+
+    tool_call_id = (payload.get("toolCallId") or "").strip()
+    if not tool_call_id:
+        tool_call_id = f"questionnaire-{int(time.time() * 1000)}"
+
+    title = (payload.get("title") or "").strip() or "问答"
+    questions = payload.get("questions") or []
+    draft_answers = payload.get("draftAnswers") or {}
+
+    item = {
+        "sessionId": sid,
+        "toolCallId": tool_call_id,
+        "title": title,
+        "questions": questions,
+        "draftAnswers": draft_answers,
+    }
+    return item
+
+
+def get_pending_questionnaires(session_id: str) -> List[Dict[str, Any]]:
+    return []
+
+
+def handle_questionnaire_response(
+    session_id: str,
+    tool_call_id: str,
+    outcome: str,
+    answers: Optional[Dict[str, Any]] = None,
+) -> bool:
+    sid = (session_id or "").strip()
+    tcid = (tool_call_id or "").strip()
+    out = (outcome or "").strip()
+    if not sid or not tcid:
+        return False
+
+    if not out.startswith("questionnaire_"):
+        pend = {it.get("toolCallId") for it in questionnaires.list_pending(sid) if isinstance(it, dict)}
+        if tcid not in pend:
+            return False
+
+    current = None
+    for it in questionnaires.list_pending(sid):
+        if isinstance(it, dict) and it.get("toolCallId") == tcid:
+            current = it
+            break
+
+    if out == "questionnaire_draft":
+        next_item = dict(current or {})
+        next_item["sessionId"] = sid
+        next_item["toolCallId"] = tcid
+        if answers is not None:
+            next_item["draftAnswers"] = answers
+        questionnaires.upsert_pending(sid, tcid, next_item)
+        s = _sessions.get(sid)
+        if s and isinstance(s.get("pending_questionnaires"), dict):
+            s["pending_questionnaires"][tcid] = next_item
+        return True
+
+    if out == "questionnaire_submit":
+        questionnaires.delete_pending(sid, tcid)
+        s = _sessions.get(sid)
+        if s and isinstance(s.get("pending_questionnaires"), dict) and tcid in s["pending_questionnaires"]:
+            del s["pending_questionnaires"][tcid]
+
+        payload = json.dumps({"answers": answers or {}}, ensure_ascii=False, indent=2)
+        events.emit(
+            f"acp-session-update-{sid}",
+            {
+                "sessionUpdate": "tool_call_update",
+                "toolCallId": tcid,
+                "status": "completed",
+                "content": payload,
+            },
+        )
+
+        waiters = s.get("questionnaire_waiters") if s else None
+        if isinstance(waiters, dict) and tcid in waiters:
+            try:
+                waiters[tcid]["answers"] = answers or {}
+                waiters[tcid]["event"].set()
+            except Exception:
+                pass
+
+        return True
+
+    return False
+
+
+def create_questionnaire_and_wait(
+    session_id: str, payload: Dict[str, Any], timeout_seconds: Optional[int] = None
+) -> Optional[Dict[str, Any]]:
+    return _run_text_questionnaire(session_id, payload)

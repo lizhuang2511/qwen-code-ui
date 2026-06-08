@@ -4,6 +4,7 @@ import {
   EnrichedProject,
   ProjectsResponse,
   RecentChat,
+  SkillSearchHit,
   SearchFilters,
   SearchResult,
   webApi,
@@ -91,11 +92,34 @@ export interface API {
   }): Promise<void>;
   get_process_statuses(): Promise<ProcessStatus[]>;
   kill_process(params: { conversationId: string }): Promise<void>;
+  create_questionnaire(params: {
+    sessionId: string;
+    toolCallId?: string | null;
+    title: string;
+    questions: Record<string, unknown>[];
+    draftAnswers?: Record<string, unknown> | null;
+  }): Promise<{
+    sessionId: string;
+    toolCallId: string;
+    title: string;
+    questions: Record<string, unknown>[];
+    draftAnswers?: Record<string, unknown>;
+  }>;
+  get_pending_questionnaires(params: { sessionId: string }): Promise<
+    {
+      sessionId: string;
+      toolCallId: string;
+      title: string;
+      questions: Record<string, unknown>[];
+      draftAnswers?: Record<string, unknown>;
+    }[]
+  >;
   send_tool_call_confirmation_response(params: {
     sessionId: string;
     requestId: number;
     toolCallId: string;
     outcome: string;
+    answers?: Record<string, unknown>;
   }): Promise<void>;
   execute_confirmed_command(params: { command: string }): Promise<string>;
   generate_conversation_title(params: {
@@ -104,6 +128,7 @@ export interface API {
   }): Promise<string>;
   validate_directory(params: { path: string }): Promise<boolean>;
   is_home_directory(params: { path: string }): Promise<boolean>;
+  create_temp_workspace(): Promise<string>;
   get_home_directory(): Promise<string>;
   get_parent_directory(params: { path: string }): Promise<string | null>;
   list_directory_contents(params: { path: string }): Promise<DirEntry[]>;
@@ -117,6 +142,7 @@ export interface API {
   get_canonical_path(params: { path: string }): Promise<string>;
   select_directory(): Promise<string | null>;
   select_save_file(params: {
+    sessionId?: string;
     directory?: string;
     defaultFilename?: string;
   }): Promise<string | null>;
@@ -247,12 +273,17 @@ export interface API {
   remove_project_skill(params: { projectId: string; skill: string }): Promise<{ skills: string[] }>;
   import_project_skills(params: { projectId: string; skills: string[] }): Promise<{ skills: string[] }>;
   get_skill_content(params: { skill: string; projectPath?: string }): Promise<{ path: string; content: string }>;
+  resolve_skill_folders(params: { skills: string[]; projectPath?: string }): Promise<string[]>;
+  search_skills(params: { q: string; mode?: "name" | "content" | "all"; projectPath?: string; limit?: number }): Promise<
+    SkillSearchHit[]
+  >;
   get_qwen_settings(): Promise<any>;
   update_qwen_settings(params: any): Promise<{ ok: boolean; error?: string }>;
   get_ui_settings(): Promise<any>;
   save_ui_settings(params: any): Promise<{ ok: boolean; error?: string }>;
   open_qwen_settings_in_editor(): Promise<{ ok: boolean; error?: string }>;
   open_qwen_folder(): Promise<{ ok: boolean; error?: string }>;
+  open_global_skills_folder(): Promise<{ ok: boolean; error?: string }>;
   open_model_providers_json(): Promise<{ ok: boolean; error?: string }>;
   get_model_providers(): Promise<{ providers: any[]; error?: string }>;
   test_connection(params: { base_url: string; api_key: string; model: string }): Promise<{ ok: boolean; error?: string; data?: any }>;

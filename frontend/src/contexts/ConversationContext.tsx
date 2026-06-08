@@ -34,7 +34,11 @@ export interface ConversationContextType {
     historyEntries?: ConversationHistoryEntry[],
     workingDirectory?: string
   ) => Promise<Conversation>;
-  handleConfirmToolCall: (toolCallId: string, outcome: string) => Promise<void>;
+  handleConfirmToolCall: (
+    toolCallId: string,
+    outcome: string,
+    extra?: { answers?: Record<string, unknown> }
+  ) => Promise<void>;
   confirmationRequests: Map<string, ToolCallConfirmationRequest>;
   removeConversation: (conversationId: string) => void;
   progress: SessionProgressPayload | null;

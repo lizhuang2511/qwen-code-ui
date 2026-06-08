@@ -7,6 +7,7 @@ import shlex
 import time
 import tempfile
 import urllib.request
+import threading
 import events
 import filesystem
 import search
@@ -30,6 +31,8 @@ try:
     HAS_WIN32 = True
 except ImportError:
     HAS_WIN32 = False
+
+_FILE_DIALOG_LOCK = threading.Lock()
 
 class Api:
     def _get_app_dir(self) -> str:
@@ -182,8 +185,19 @@ class Api:
         base_url = params.get("base_url", "")
         api_key = params.get("api_key", "")
         model = params.get("model", "")
-        
-        if not base_url or not api_key:
+
+        def is_ollama_base_url(u: str) -> bool:
+            u = (u or "").rstrip("/")
+            return (
+                u.startswith("http://localhost:11434")
+                or u.startswith("http://127.0.0.1:11434")
+                or u.startswith("http://0.0.0.0:11434")
+                or u.startswith("https://localhost:11434")
+                or u.startswith("https://127.0.0.1:11434")
+                or u.startswith("https://0.0.0.0:11434")
+            )
+
+        if not base_url or (not api_key and not is_ollama_base_url(base_url)):
             return {"ok": False, "error": "Missing base_url or api_key"}
             
         import urllib.request
@@ -195,9 +209,10 @@ class Api:
         
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
         }
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         
         # Some providers strictly require stream parameter
         data = json.dumps({
@@ -398,10 +413,31 @@ class Api:
         session.kill_process(conversation_id)
         events.emit("process-status-changed", session.get_process_statuses())
 
+    def create_questionnaire(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        session_id = params.get("sessionId", "")
+        tool_call_id = params.get("toolCallId")
+        title = params.get("title")
+        questions = params.get("questions")
+        draft_answers = params.get("draftAnswers")
+        return session.create_questionnaire(session_id, {
+            "toolCallId": tool_call_id,
+            "title": title,
+            "questions": questions,
+            "draftAnswers": draft_answers,
+        })
+
+    def get_pending_questionnaires(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+        session_id = params.get("sessionId", "")
+        return session.get_pending_questionnaires(session_id)
+
     def send_tool_call_confirmation_response(self, params: Dict[str, Any]) -> None:
         session_id = params.get("sessionId", "")
         tool_call_id = params.get("toolCallId", "")
         outcome = params.get("outcome", "")
+        answers = params.get("answers")
+
+        if session.handle_questionnaire_response(session_id, tool_call_id, outcome, answers):
+            return
         
         # Determine status based on outcome
         # Covers "proceed_once", "proceed_always", "option_0", etc.
@@ -444,6 +480,12 @@ class Api:
 
     def get_home_directory(self) -> str:
         return filesystem.get_home_directory()
+
+    def create_temp_workspace(self, params: Optional[Dict[str, Any]] = None) -> str:
+        base = r"d:\qwencode\临时计算"
+        if not os.path.isdir(base):
+            raise FileNotFoundError(f"Temp workspace base directory not found: {base}")
+        return base
 
     def get_parent_directory(self, params: Dict[str, Any]) -> Optional[str]:
         return filesystem.get_parent_directory(params.get("path", ""))
@@ -563,11 +605,12 @@ class Api:
 
     def select_directory(self) -> Optional[str]:
         wins = getattr(webview, "windows", [])
+        if not wins or len(wins) == 0:
+            return None
+        folder_dialog = getattr(getattr(webview, "FileDialog", None), "FOLDER", getattr(webview, "FOLDER_DIALOG", None))
         result = None
-        if wins and len(wins) > 0:
-            result = wins[0].create_file_dialog(webview.FOLDER_DIALOG, allow_multiple=False)
-        else:
-            result = webview.create_file_dialog(webview.FOLDER_DIALOG, allow_multiple=False)
+        with _FILE_DIALOG_LOCK:
+            result = wins[0].create_file_dialog(folder_dialog, allow_multiple=False)
         if result is None:
             return None
         if isinstance(result, (list, tuple)):
@@ -577,19 +620,30 @@ class Api:
     def select_save_file(self, params: Dict[str, Any]) -> Optional[str]:
         directory = params.get("directory", None)
         default_filename = params.get("defaultFilename", None)
+        session_id = params.get("sessionId", None)
         wins = getattr(webview, "windows", [])
+        if not wins or len(wins) == 0:
+            return None
+        save_dialog = getattr(getattr(webview, "FileDialog", None), "SAVE", getattr(webview, "SAVE_DIALOG", None))
         dialog_kwargs: Dict[str, Any] = {}
+        if not directory and session_id:
+            wd = session.get_working_directory(str(session_id))
+            if wd and os.path.isdir(wd):
+                directory = wd
         if directory:
             dialog_kwargs["directory"] = directory
         if default_filename:
             dialog_kwargs["save_filename"] = default_filename
-        dialog_kwargs["file_types"] = ("Text Files (*.txt)", "All Files (*.*)")
+        dialog_kwargs["file_types"] = (
+            "Jupyter Notebook (*.ipynb)",
+            "Markdown (*.md)",
+            "Text Files (*.txt)",
+            "All Files (*.*)",
+        )
 
         result = None
-        if wins and len(wins) > 0:
-            result = wins[0].create_file_dialog(webview.SAVE_DIALOG, allow_multiple=False, **dialog_kwargs)
-        else:
-            result = webview.create_file_dialog(webview.SAVE_DIALOG, allow_multiple=False, **dialog_kwargs)
+        with _FILE_DIALOG_LOCK:
+            result = wins[0].create_file_dialog(save_dialog, allow_multiple=False, **dialog_kwargs)
         if result is None:
             return None
         if isinstance(result, (list, tuple)):
@@ -979,6 +1033,26 @@ class Api:
             print(f"Failed to open qwen folder: {e}")
             return {"ok": False, "error": str(e)}
 
+    def open_global_skills_folder(self) -> Dict[str, Any]:
+        """
+        Opens the preferred global skills directory in the system's file manager.
+        """
+        path = projects.get_preferred_global_skills_dir()
+        try:
+            if not os.path.exists(path):
+                os.makedirs(path)
+
+            if sys.platform == 'win32':
+                os.startfile(path)
+            elif sys.platform == 'darwin':
+                subprocess.Popen(['open', path])
+            else:
+                subprocess.Popen(['xdg-open', path])
+            return {"ok": True}
+        except Exception as e:
+            print(f"Failed to open global skills folder: {e}")
+            return {"ok": False, "error": str(e)}
+
     def open_model_providers_json(self) -> Dict[str, Any]:
         """
         Opens the model_providers.json file in the default text editor.
@@ -1048,8 +1122,59 @@ class Api:
         env_key = params.get("env_key", "")
         use_oauth = params.get("use_oauth", False)
         enable_thinking = params.get("enable_thinking", False)
-        
-        if not use_oauth and (not provider_id or not base_url or not api_key):
+        apply_sampling_params_globally = params.get("apply_sampling_params_globally", False) is True
+
+        def _parse_temperature(v):
+            if v is None or v == "":
+                return None
+            try:
+                n = float(v)
+            except Exception:
+                return None
+            if n < 0:
+                return 0.0
+            if n > 2:
+                return 2.0
+            return n
+
+        def _parse_max_tokens(v):
+            if v is None or v == "":
+                return None
+            try:
+                n = int(v)
+            except Exception:
+                return None
+            if n < 1:
+                return 1
+            return n
+
+        def _parse_timeout_ms(v):
+            if v is None or v == "":
+                return None
+            try:
+                n = int(v)
+            except Exception:
+                return None
+            if n < 1000:
+                return 1000
+            return n
+
+        temperature = _parse_temperature(params.get("temperature", None))
+        max_tokens = _parse_max_tokens(params.get("max_tokens", None))
+        timeout_ms = _parse_timeout_ms(params.get("timeout_ms", None))
+
+        def is_ollama_base_url(u: str) -> bool:
+            u = (u or "").rstrip("/")
+            return (
+                u.startswith("http://localhost:11434")
+                or u.startswith("http://127.0.0.1:11434")
+                or u.startswith("http://0.0.0.0:11434")
+                or u.startswith("https://localhost:11434")
+                or u.startswith("https://127.0.0.1:11434")
+                or u.startswith("https://0.0.0.0:11434")
+            )
+
+        if not use_oauth and (not provider_id or not base_url or (not api_key and not is_ollama_base_url(base_url))):
             return {"ok": False, "error": "Missing required fields (provider_id, base_url, api_key)"}
 
         # Handle OAuth mode
@@ -1080,31 +1205,53 @@ class Api:
                     break
             
             if not coder_model_provider:
+                sampling_params = {
+                    "temperature": temperature if temperature is not None else 0.5,
+                    "max_tokens": max_tokens if max_tokens is not None else 4096,
+                    "top_p": 0.95
+                }
                 coder_model_provider = {
                     "id": "coder-model",
                     "name": "Qwen OAuth Model",
                     "generationConfig": {
                         "maxRetries": 3,
-                        "timeout": 60000,
-                        "samplingParams": {
-                            "temperature": 0.5,
-                            "max_tokens": 4096,
-                            "top_p": 0.95
-                        }
+                        "timeout": timeout_ms if timeout_ms is not None else 60000,
+                        "samplingParams": sampling_params
                     }
                 }
                 openai_providers.append(coder_model_provider)
             
             if "generationConfig" not in coder_model_provider:
                 coder_model_provider["generationConfig"] = {}
+            if "samplingParams" not in coder_model_provider["generationConfig"]:
+                coder_model_provider["generationConfig"]["samplingParams"] = {}
+            if temperature is not None:
+                coder_model_provider["generationConfig"]["samplingParams"]["temperature"] = temperature
+            if max_tokens is not None:
+                coder_model_provider["generationConfig"]["samplingParams"]["max_tokens"] = max_tokens
             if "extra_body" not in coder_model_provider["generationConfig"]:
                 coder_model_provider["generationConfig"]["extra_body"] = {}
                 
             if enable_thinking:
                 coder_model_provider["generationConfig"]["extra_body"]["enable_thinking"] = True
-                coder_model_provider["generationConfig"]["timeout"] = 300000
+                coder_model_provider["generationConfig"]["timeout"] = timeout_ms if timeout_ms is not None else 300000
             else:
                 coder_model_provider["generationConfig"]["extra_body"]["enable_thinking"] = False
+                if timeout_ms is not None:
+                    coder_model_provider["generationConfig"]["timeout"] = timeout_ms
+
+            if apply_sampling_params_globally and (temperature is not None or max_tokens is not None):
+                for p in openai_providers:
+                    gen = p.get("generationConfig")
+                    if not isinstance(gen, dict):
+                        p["generationConfig"] = {}
+                        gen = p["generationConfig"]
+                    if "samplingParams" not in gen or not isinstance(gen.get("samplingParams"), dict):
+                        gen["samplingParams"] = {}
+                    if temperature is not None:
+                        gen["samplingParams"]["temperature"] = temperature
+                    if max_tokens is not None:
+                        gen["samplingParams"]["max_tokens"] = max_tokens
             
             # Write back
             try:
@@ -1150,10 +1297,10 @@ class Api:
             "envKey": env_key,
             "generationConfig": {
                 "maxRetries": 3,
-                "timeout": 60000,
+                "timeout": timeout_ms if timeout_ms is not None else 60000,
                 "samplingParams": {
-                    "temperature": 0.5,
-                    "max_tokens": 4096,
+                    "temperature": temperature if temperature is not None else 0.5,
+                    "max_tokens": max_tokens if max_tokens is not None else 4096,
                     "top_p": 0.95
                 }
             }
@@ -1164,13 +1311,25 @@ class Api:
                 "enable_thinking": True
             }
             # Increase timeout for thinking models as they take longer
-            new_provider_config["generationConfig"]["timeout"] = 300000
+            new_provider_config["generationConfig"]["timeout"] = timeout_ms if timeout_ms is not None else 300000
         else:
             new_provider_config["generationConfig"]["extra_body"] = {
                 "enable_thinking": False
             }
         
         new_providers.append(new_provider_config)
+        if apply_sampling_params_globally and (temperature is not None or max_tokens is not None):
+            for p in new_providers:
+                gen = p.get("generationConfig")
+                if not isinstance(gen, dict):
+                    p["generationConfig"] = {}
+                    gen = p["generationConfig"]
+                if "samplingParams" not in gen or not isinstance(gen.get("samplingParams"), dict):
+                    gen["samplingParams"] = {}
+                if temperature is not None:
+                    gen["samplingParams"]["temperature"] = temperature
+                if max_tokens is not None:
+                    gen["samplingParams"]["max_tokens"] = max_tokens
         settings["modelProviders"]["openai"] = new_providers
             
         # 3. Set current model
@@ -1330,3 +1489,19 @@ class Api:
         skill = params.get("skill", "")
         project_path = params.get("projectPath", "") or params.get("project_path", "")
         return projects.get_skill_content(skill, project_path or "")
+
+    def search_skills(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+        q = params.get("q", "") or params.get("query", "")
+        mode = params.get("mode", "all")
+        project_path = params.get("projectPath", "") or params.get("project_path", "")
+        limit = params.get("limit", 200)
+        return projects.search_skills(q, mode, project_path or "", limit)
+
+    def resolve_skill_folders(self, params: Dict[str, Any]) -> List[str]:
+        skills = params.get("skills", [])
+        if skills is None:
+            skills = []
+        if not isinstance(skills, list):
+            skills = [skills]
+        project_path = params.get("projectPath", "") or params.get("project_path", "")
+        return projects.resolve_skill_folders(skills, project_path or "")

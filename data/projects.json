@@ -2,7 +2,7 @@
   "items": [
     {
       "id": "f25ea7439c3b8cd9d2c4195d8ad822eb969bf8f53737a93b04a5737b10c5ef02",
-      "path": "d:/qwencode/临时计算",
+      "path": "d:\\qwencode\\临时计算",
       "title": "临时计算",
       "tags": [
         "临时"
@@ -12,19 +12,25 @@
       "id": "3b4ff6e9d67141bdaec98fae29cc44ed21bd414d601c8e0108a8459746deae4f",
       "path": "d:/trae项目/机械设计软件重构/弹簧设计",
       "title": "弹簧设计",
-      "tags": []
+      "tags": [
+        "机械设计"
+      ]
     },
     {
       "id": "30fa80384b2e62a7c06f8a11b006e828a59ba3dd98289b8ad7beecadb25f7c54",
       "path": "D:\\trae项目\\机械设计软件重构\\涡轮蜗杆计算",
       "title": "涡轮蜗杆计算",
-      "tags": []
+      "tags": [
+        "机械设计"
+      ]
     },
     {
       "id": "40227c6c34976888241716683cb34e1e22886801c66873cab0e441d16cb21747",
       "path": "D:\\trae项目\\机械设计软件重构\\gearbox",
       "title": "gearbox",
-      "tags": []
+      "tags": [
+        "机械设计"
+      ]
     },
     {
       "id": "edb82e6aa68184f343ccad0272a674aa6e574ea8607cb0e6354aa6612b9b4258",
@@ -37,27 +43,42 @@
     {
       "id": "681796dd2750de778188fdc66a3f8fa0eb9ec36ffd5dc8296800ecfdaa6f8677",
       "path": "D:\\trae项目\\模态分析",
-      "title": "模态分析"
+      "title": "模态分析",
+      "tags": [
+        "机械设计"
+      ]
     },
     {
       "id": "36f1db2f891d1bd38ebb2a2b927dda7187964772a10c17076b8b1a6557eb3499",
       "path": "d:/伺服曲线规划软件笔记",
-      "title": "伺服曲线规划软件笔记"
+      "title": "伺服曲线规划软件笔记",
+      "tags": [
+        "机械设计"
+      ]
     },
     {
       "id": "6008013aed29de1003257a1dbcd6c5039f72082c8c1a1a2ac65c12731dfac964",
       "path": "d:\\学习",
-      "title": "学习"
+      "title": "学习",
+      "tags": [
+        "机械设计"
+      ]
     },
     {
       "id": "9cc8b9ba349055c3f54e05c1528604a22823d002c618f50762194a439d271361",
       "path": "d:/qwencode/保险购买",
-      "title": "保险购买"
+      "title": "保险购买",
+      "tags": [
+        "生活"
+      ]
     },
     {
       "id": "3f7b7bad405253c4016fb9aa498a8d6d5b28d0ef5d92c260da8ec897c25938f6",
       "path": "d:/qwencode/stem调研",
-      "title": "stem调研"
+      "title": "stem调研",
+      "tags": [
+        "创业项目"
+      ]
     },
     {
       "id": "730c81e651567426339cd3b4b8eb7cd4592a2953343f8942a85da0e0f4be0394",
@@ -68,7 +89,11 @@
       "id": "222dbd295c34bfdd2d9ed718bf639babb8a9936356a279f70b8f3d5c11988401",
       "path": "d:/qwencode/测试重复",
       "title": "测试重复",
-      "tags": []
+      "tags": [],
+      "skills": [
+        "1password-1.0.1"
+      ],
+      "disabled_skills": []
     },
     {
       "id": "25a96af192c8f28f414e65a412664e5e8346c0d503bad91a00721c329c686358",
@@ -77,33 +102,48 @@
     },
     {
       "id": "fcdbe86b990400107722d8e7f12294496d9f9d319ffd8f680f41eb02421c795b",
-      "path": "d:/giteecode/qwencode5",
+      "path": "D:\\giteecode\\qwencode5",
       "title": "qwencode5"
     },
     {
       "id": "60fcc240c873fc56b19561797e74364d24e6b0fcc32f0c0988e23d46c28a4c49",
       "path": "D:\\giteecode\\情绪管理",
-      "title": "情绪管理"
+      "title": "情绪管理",
+      "tags": [
+        "医学心理学"
+      ]
     },
     {
       "id": "c0523342b299d690dec0a6b242f04465a4f63ca3ae7d71fcc989d1656dad624b",
       "path": "d:/金融数据/2011-2021年chfs数据/2021",
-      "title": "2021"
+      "title": "2021",
+      "tags": [
+        "经济决策"
+      ]
     },
     {
       "id": "a535a838b16800f27b7d365c9885f31c061f6788c93ec502c45b07cf4b24d843",
       "path": "D:\\trae项目\\机械设计软件重构\\连接计算",
-      "title": "连接计算"
+      "title": "连接计算",
+      "tags": [
+        "机械设计"
+      ]
     },
     {
       "id": "af676ffadbfb99564ee2ab258ca5e074b9699e77838d9f067513ce0beed32b15",
       "path": "d:/工作/螺栓应力",
-      "title": "螺栓应力"
+      "title": "螺栓应力",
+      "tags": [
+        "机械设计"
+      ]
     },
     {
       "id": "172bf0be3d325830df3a91eb39eeb1d3d2d8c926bd60f675e2258810bd21737c",
       "path": "D:\\EXUDYN-master\\main\\pythonDev\\Examples",
-      "title": "Examples"
+      "title": "Examples",
+      "tags": [
+        "机械设计"
+      ]
     },
     {
       "id": "147d053fcf4abbcfe7651a3aa9d6b1b08fa2acf50988ac83615bde59bc6d417b",
@@ -113,12 +153,112 @@
     {
       "id": "0d1c4cefbc61e5b39b1e6b59e2fc77e6428b238c3098233d21d7e85a3dc77296",
       "path": "d:/工作/电机学习",
-      "title": "电机学习"
+      "title": "电机学习",
+      "tags": [
+        "机械设计"
+      ]
     },
     {
       "id": "0465a8241b11d3d05ea5bcda809a32dac3faa96d1c3aaa74b926bd6e404d6d94",
-      "path": "d:/工作/图书skills",
-      "title": "图书skills"
+      "path": "D:\\工作\\图书skills",
+      "title": "图书skills",
+      "tags": [
+        "辅助工具"
+      ]
+    },
+    {
+      "id": "ec4bb7a1b7ba196a7488d9207cde7f76283f0839b67d0f7cda61b54dbd2aa262",
+      "path": "d:/工作/视频生成html",
+      "title": "视频生成html",
+      "tags": [
+        "自媒体"
+      ]
+    },
+    {
+      "id": "6b75dc4ba9f93cfbb942368f603efc513686e2606dfb56cc3b26866bef8727ed",
+      "path": "D:\\工作\\中医",
+      "title": "中医",
+      "tags": [
+        "医学心理学"
+      ]
+    },
+    {
+      "id": "25fbb2b29ac267bc42cd26e56bbafeef772623bc60b1afbaceb2d02e577c4597",
+      "path": "d:/giteecode/参考有价值代码/gears-mainpython-10",
+      "title": "gears-mainpython-10",
+      "tags": [
+        "机械设计"
+      ]
+    },
+    {
+      "id": "8939faa10e23bd83600badb7a9953336e3ee6ed3361dab359f4b231dcb59802d",
+      "path": "D:\\giteecode\\加目录",
+      "title": "加目录",
+      "tags": [
+        "辅助工具"
+      ]
+    },
+    {
+      "id": "5eda9e0bdced1238070ef7391d12352466e2ad49546a860ae35a66d4f4c1f43a",
+      "path": "D:\\trae项目\\食物营养平衡分析程序",
+      "title": "食物营养平衡分析程序",
+      "tags": [
+        "营养健身"
+      ]
+    },
+    {
+      "id": "876bb5ae1f9a41d923446f7a9f56763f7895f25d0293ddfdd209564ddf90dc78",
+      "path": "d:/qwencode/齿轮几何与应用原理",
+      "title": "齿轮几何与应用原理",
+      "tags": [
+        "机械设计"
+      ]
+    },
+    {
+      "id": "b284ef3f51e248e267fc45d10893afcd1a5aa602f5f7e19c0129c555dae270ed",
+      "path": "d:/qwencode/机械产品成本估算",
+      "title": "机械产品成本估算",
+      "tags": [
+        "机械设计"
+      ]
+    },
+    {
+      "id": "e061ba7a09db57ddcb4bb17d1e082936e9e3f58e7e0750c9ae990175cadaebfd",
+      "path": "D:\\qwencode\\qwencode交互",
+      "title": "qwencode交互",
+      "tags": [
+        "辅助工具"
+      ]
+    },
+    {
+      "id": "81db672a688da9c3b78f86dfadae49fb09c6f31dad381fc6d69b5edb896db62e",
+      "path": "d:/gitee2/jixieyaliji4",
+      "title": "jixieyaliji4"
+    },
+    {
+      "id": "5fc196dd05fd425b2fa9ec276317eb9d9aaa1086b5e1d94ea2f8c18607dd8b42",
+      "path": "d:/机械项目/滚柱丝杠",
+      "title": "滚柱丝杠"
+    },
+    {
+      "id": "e4e4f106e339b65cb5333d8f6e06d5053bbc65155afda5aee3b1be959c281ff2",
+      "path": "d:/qwencode/营养分析智能体",
+      "title": "营养分析智能体"
+    },
+    {
+      "id": "0a70448897f4a0816576a1bedb7bebc1d99ce4c36f41d9abfdb307034922c8fd",
+      "path": "d:/qwencode/ima测试",
+      "title": "ima测试"
+    },
+    {
+      "id": "9bab48672b40852da8eb04cd1ef356b5b01d8bf091c4fc7cdca16816e10d75e3",
+      "path": "C:\\Users\\lizhuang\\AppData\\Local\\Temp\\qwencode5\\chat-l3wcj3_t",
+      "title": "chat-l3wcj3_t"
+    },
+    {
+      "id": "da1aa50b04f21206bcc3ca3a613a1b44342144709bda774a72f5c1a2ffd16e27",
+      "path": "d:/qwencode/飞轮能量",
+      "title": "飞轮能量"
     }
   ]
 }

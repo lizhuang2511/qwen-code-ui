@@ -1,6 +1,11 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Check, CheckCheck, X, Loader2, Terminal } from "lucide-react";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
+import { Checkbox } from "../ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
+import { Label } from "../ui/label";
 import type {
   ToolCall,
   ToolCallConfirmationRequest,
@@ -13,7 +18,11 @@ import { McpPermissionCompact } from "../mcp/McpPermissionCompact";
 
 interface ToolCallDisplayProps {
   toolCall: ToolCall;
-  onConfirm?: (toolCallId: string, outcome: string) => Promise<void>;
+  onConfirm?: (
+    toolCallId: string,
+    outcome: string,
+    extra?: { answers?: Record<string, unknown> }
+  ) => Promise<void>;
   hasConfirmationRequest?: boolean;
   confirmationRequest?: ToolCallConfirmationRequest | undefined;
   confirmationRequests?: Map<string, ToolCallConfirmationRequest>;
@@ -30,12 +39,20 @@ function ToolCallDisplayComponent({
 }: ToolCallDisplayProps) {
   const { t } = useTranslation();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [questionnaireErrors, setQuestionnaireErrors] = useState<
+    Record<string, string>
+  >({});
+  const questionnaireDraftTimerRef = useRef<number | null>(null);
 
-  const handleConfirm = async (toolCallId: string, outcome: string) => {
+  const handleConfirm = async (
+    toolCallId: string,
+    outcome: string,
+    extra?: { answers?: Record<string, unknown> }
+  ) => {
     if (isSubmitting || !onConfirm) return;
     setIsSubmitting(true);
     try {
-      await onConfirm(toolCallId, outcome);
+      await onConfirm(toolCallId, outcome, extra);
     } finally {
       setIsSubmitting(false);
     }
@@ -51,6 +68,63 @@ function ToolCallDisplayComponent({
     ...toolCall,
     confirmationRequest:
       actualConfirmationRequest || toolCall.confirmationRequest,
+  };
+
+  const questionnaire = enhancedToolCall.confirmationRequest?.questionnaire;
+  const isQuestionnaire =
+    enhancedToolCall.confirmationRequest?.confirmation?.type ===
+      "questionnaire" && !!questionnaire;
+  const [questionnaireAnswers, setQuestionnaireAnswers] = useState<
+    Record<string, unknown>
+  >(() => questionnaire?.draftAnswers || {});
+
+  const scheduleQuestionnaireDraftSave = (answers: Record<string, unknown>) => {
+    if (!onConfirm) return;
+    if (questionnaireDraftTimerRef.current) {
+      window.clearTimeout(questionnaireDraftTimerRef.current);
+    }
+    questionnaireDraftTimerRef.current = window.setTimeout(() => {
+      onConfirm(enhancedToolCall.id, "questionnaire_draft", { answers }).catch(
+        () => {}
+      );
+    }, 400);
+  };
+
+  const updateQuestionnaireAnswer = (
+    questionId: string,
+    value: unknown
+  ): void => {
+    setQuestionnaireErrors((prev) => {
+      if (!prev[questionId]) return prev;
+      const next = { ...prev };
+      delete next[questionId];
+      return next;
+    });
+    setQuestionnaireAnswers((prev) => {
+      const next = { ...prev, [questionId]: value };
+      scheduleQuestionnaireDraftSave(next);
+      return next;
+    });
+  };
+
+  const validateQuestionnaire = (): boolean => {
+    if (!questionnaire) return true;
+    const errors: Record<string, string> = {};
+    for (const q of questionnaire.questions || []) {
+      if (!q.required) continue;
+      const v = questionnaireAnswers[q.id];
+      if (q.type === "multi") {
+        if (!Array.isArray(v) || v.length === 0) {
+          errors[q.id] = "必填";
+        }
+        continue;
+      }
+      if (typeof v !== "string" || v.trim() === "") {
+        errors[q.id] = "必填";
+      }
+    }
+    setQuestionnaireErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   // Convert snake_case to PascalCase
@@ -390,6 +464,129 @@ function ToolCallDisplayComponent({
             }
             return null;
           })()}
+
+          {isQuestionnaire && questionnaire && (
+            <div className="mt-4 border rounded-lg p-3 bg-muted/20">
+              <div className="text-sm font-medium">{questionnaire.title}</div>
+              <div className="mt-3 space-y-4">
+                {questionnaire.questions.map((q) => (
+                  <div key={q.id} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm">{q.label}</div>
+                      {q.required && (
+                        <div className="text-xs text-red-500">*</div>
+                      )}
+                    </div>
+                    {q.type === "single" && (
+                      <RadioGroup
+                        value={
+                          typeof questionnaireAnswers[q.id] === "string"
+                            ? (questionnaireAnswers[q.id] as string)
+                            : ""
+                        }
+                        onValueChange={(v) => updateQuestionnaireAnswer(q.id, v)}
+                        className="space-y-2"
+                      >
+                        {q.options.map((opt) => (
+                          <div
+                            key={opt.id}
+                            className="flex items-center gap-2"
+                          >
+                            <RadioGroupItem value={opt.id} id={`${q.id}-${opt.id}`} />
+                            <Label htmlFor={`${q.id}-${opt.id}`} className="text-sm">
+                              {opt.label}
+                            </Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    )}
+                    {q.type === "multi" && (
+                      <div className="space-y-2">
+                        {q.options.map((opt) => {
+                          const arr = Array.isArray(questionnaireAnswers[q.id])
+                            ? (questionnaireAnswers[q.id] as string[])
+                            : [];
+                          const checked = arr.includes(opt.id);
+                          return (
+                            <div
+                              key={opt.id}
+                              className="flex items-center gap-2"
+                            >
+                              <Checkbox
+                                id={`${q.id}-${opt.id}`}
+                                checked={checked}
+                                onCheckedChange={(c) => {
+                                  const next = c
+                                    ? [...arr, opt.id]
+                                    : arr.filter((x) => x !== opt.id);
+                                  updateQuestionnaireAnswer(q.id, next);
+                                }}
+                              />
+                              <Label
+                                htmlFor={`${q.id}-${opt.id}`}
+                                className="text-sm"
+                              >
+                                {opt.label}
+                              </Label>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {q.type === "text" &&
+                      (q.multiline ? (
+                        <Textarea
+                          value={
+                            typeof questionnaireAnswers[q.id] === "string"
+                              ? (questionnaireAnswers[q.id] as string)
+                              : ""
+                          }
+                          placeholder={q.placeholder}
+                          onChange={(e) =>
+                            updateQuestionnaireAnswer(q.id, e.target.value)
+                          }
+                        />
+                      ) : (
+                        <Input
+                          value={
+                            typeof questionnaireAnswers[q.id] === "string"
+                              ? (questionnaireAnswers[q.id] as string)
+                              : ""
+                          }
+                          placeholder={q.placeholder}
+                          onChange={(e) =>
+                            updateQuestionnaireAnswer(q.id, e.target.value)
+                          }
+                        />
+                      ))}
+                    {questionnaireErrors[q.id] && (
+                      <div className="text-xs text-red-500">
+                        {questionnaireErrors[q.id]}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (!validateQuestionnaire()) return;
+                    handleConfirm(enhancedToolCall.id, "questionnaire_submit", {
+                      answers: questionnaireAnswers,
+                    });
+                  }}
+                  disabled={isSubmitting || !hasConfirmationRequest || !onConfirm}
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "提交"
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* For edit tools, show the specialized edit renderer */}
           {!isMcpToolCall() &&

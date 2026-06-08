@@ -10,7 +10,19 @@ export function downloadTextContent(content: string, filePath: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = filePath.split("/").pop() || "file.txt";
+  a.download = filePath.split(/[\\/]/).pop() || "file.txt";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export function downloadMarkdownContent(content: string, filePath: string): void {
+  const blob = new Blob([content], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filePath.split(/[\\/]/).pop() || "file.md";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -21,7 +33,7 @@ export function downloadTextContent(content: string, filePath: string): void {
  * Downloads image data as a file
  */
 export function downloadImageData(imageData: string, filePath: string): void {
-  const fileName = filePath.split("/").pop() || "image.png";
+  const fileName = filePath.split(/[\\/]/).pop() || "image.png";
   const link = document.createElement("a");
   link.href = imageData;
   link.download = fileName;

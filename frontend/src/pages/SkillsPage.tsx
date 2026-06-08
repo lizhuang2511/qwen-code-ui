@@ -2,12 +2,13 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { ArrowLeft, ClipboardPaste, Copy, X } from "lucide-react";
+import { ArrowLeft, Copy, FolderOpen, X } from "lucide-react";
 import { api } from "../lib/api";
-import { EnrichedProject } from "../lib/webApi";
+import { EnrichedProject, SkillSearchHit } from "../lib/webApi";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Checkbox } from "../components/ui/checkbox";
+import { Input } from "../components/ui/input";
 import { ScrollArea } from "../components/ui/scroll-area";
 import {
   Select,
@@ -46,10 +47,13 @@ export default function SkillsPage() {
   const [projects, setProjects] = React.useState<EnrichedProject[]>([]);
   const [activeSkill, setActiveSkill] = React.useState<string | null>(null);
   const [selected, setSelected] = React.useState<Record<string, boolean>>({});
-  const [importTargetProjectId, setImportTargetProjectId] = React.useState<string | null>(null);
   const [rightTab, setRightTab] = React.useState<"content" | "projects">("content");
   const [skillDoc, setSkillDoc] = React.useState<{ path: string; content: string } | null>(null);
   const [isSkillDocLoading, setIsSkillDocLoading] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [searchMode, setSearchMode] = React.useState<"name" | "content" | "all">("name");
+  const [searchHits, setSearchHits] = React.useState<SkillSearchHit[] | null>(null);
+  const [isSearching, setIsSearching] = React.useState(false);
 
   const allSkills = React.useMemo(() => {
     const projectSkills: string[] = [];
@@ -65,6 +69,38 @@ export default function SkillsPage() {
     if (!activeSkill) return [];
     return projects.filter((p) => (p.skills || []).includes(activeSkill));
   }, [activeSkill, projects]);
+
+  const activeProjectPath = React.useMemo(() => {
+    const p = activeProjects[0];
+    return p?.root_path || p?.metadata?.path || "";
+  }, [activeProjects]);
+
+  const hitIndex = React.useMemo(() => {
+    const m = new Map<string, SkillSearchHit>();
+    for (const h of searchHits || []) {
+      if (!h?.skill) continue;
+      m.set(h.skill, h);
+    }
+    return m;
+  }, [searchHits]);
+
+  const displaySkills = React.useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) return allSkills;
+    if (searchMode === "name") {
+      const qFold = q.toLocaleLowerCase();
+      return allSkills.filter((s) => s.toLocaleLowerCase().includes(qFold));
+    }
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const h of searchHits || []) {
+      const s = normalizeSkillName(h.skill);
+      if (!s || seen.has(s)) continue;
+      seen.add(s);
+      out.push(s);
+    }
+    return out;
+  }, [allSkills, searchHits, searchMode, searchQuery]);
 
   const selectedSkills = React.useMemo(() => {
     return Object.entries(selected)
@@ -95,9 +131,9 @@ export default function SkillsPage() {
   }, [refresh]);
 
   React.useEffect(() => {
-    if (activeSkill && allSkills.includes(activeSkill)) return;
-    setActiveSkill(allSkills.length > 0 ? allSkills[0] : null);
-  }, [activeSkill, allSkills]);
+    if (activeSkill && displaySkills.includes(activeSkill)) return;
+    setActiveSkill(displaySkills.length > 0 ? displaySkills[0] : null);
+  }, [activeSkill, displaySkills]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -108,7 +144,10 @@ export default function SkillsPage() {
       }
       setIsSkillDocLoading(true);
       try {
-        const res = await api.get_skill_content({ skill: activeSkill });
+        const res = await api.get_skill_content({
+          skill: activeSkill,
+          projectPath: activeProjectPath || undefined,
+        });
         if (!cancelled) {
           setSkillDoc(res || null);
         }
@@ -121,15 +160,34 @@ export default function SkillsPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeSkill]);
+  }, [activeProjectPath, activeSkill]);
 
   React.useEffect(() => {
-    if (importTargetProjectId) {
-      const exists = projects.some((p) => p.sha256 === importTargetProjectId);
-      if (exists) return;
+    const q = searchQuery.trim();
+    if (!q || searchMode === "name") {
+      setSearchHits(null);
+      setIsSearching(false);
+      return;
     }
-    setImportTargetProjectId(projects.length > 0 ? projects[0].sha256 : null);
-  }, [importTargetProjectId, projects]);
+    let cancelled = false;
+    setIsSearching(true);
+    const handle = window.setTimeout(async () => {
+      try {
+        const res = await api.search_skills({ q, mode: searchMode });
+        if (!cancelled) {
+          setSearchHits(res || []);
+        }
+      } catch (e) {
+        if (!cancelled) setSearchHits([]);
+      } finally {
+        if (!cancelled) setIsSearching(false);
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [searchMode, searchQuery]);
 
   const handleToggleSelected = React.useCallback((skill: string) => {
     setSelected((prev) => {
@@ -149,11 +207,23 @@ export default function SkillsPage() {
       toast.error(t("skills.noSkillsSelected", "请先勾选 Skills"));
       return;
     }
-    const content = selectedSkills.join("\n");
     try {
-      const ok = await api.set_clipboard_content({ type: "text", content });
+      const folders = await api.resolve_skill_folders({ skills: selectedSkills });
+      if (!folders || folders.length === 0) {
+        toast.error(t("skills.copyFolderNotFound", "未找到可复制的 Skill 文件夹"));
+        return;
+      }
+      const ok = await api.set_clipboard_content({ type: "files", content: folders });
       if (ok) {
-        toast.success(t("skills.copied", "已复制到剪贴板"));
+        toast.success(t("skills.copiedFolders", "已复制 Skill 文件夹到剪贴板"));
+        return;
+      }
+      const textOk = await api.set_clipboard_content({
+        type: "text",
+        content: folders.join("\n"),
+      });
+      if (textOk) {
+        toast.success(t("skills.copiedFolderPaths", "已复制 Skill 文件夹路径到剪贴板"));
       } else {
         toast.error(t("skills.copyFailed", "复制失败"));
       }
@@ -167,51 +237,17 @@ export default function SkillsPage() {
     setSelected({});
   }, []);
 
-  const parseSkillsFromClipboardText = React.useCallback((text: string): string[] => {
-    const items = (text || "")
-      .split(/\r?\n|,|，|;|；/g)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    return uniqSorted(items);
-  }, []);
-
-  const handleImportFromClipboard = React.useCallback(async () => {
-    if (!importTargetProjectId) {
-      toast.error(t("skills.noImportTarget", "请先选择要导入的项目"));
-      return;
-    }
+  const handleOpenGlobalSkillsFolder = React.useCallback(async () => {
     try {
-      const clip = await api.get_clipboard_content();
-      if (!clip || clip.type !== "text" || typeof clip.content !== "string") {
-        toast.error(t("skills.clipboardEmpty", "剪贴板没有可用的文本"));
-        return;
+      const res = await api.open_global_skills_folder();
+      if (!res.ok) {
+        toast.error(t("skills.openGlobalFolderFailed", "打开全局 Skill 文件夹失败"));
       }
-      const skills = parseSkillsFromClipboardText(clip.content);
-      if (skills.length === 0) {
-        toast.error(t("skills.clipboardNoSkills", "剪贴板文本中未解析到 Skills"));
-        return;
-      }
-      const result = await api.import_project_skills({
-        projectId: importTargetProjectId,
-        skills,
-      });
-      setProjects((prev) =>
-        prev.map((p) =>
-          p.sha256 === importTargetProjectId
-            ? { ...p, skills: result.skills || [] }
-            : p
-        )
-      );
-      const latestGlobal = await api.get_skills();
-      setGlobalSkills(latestGlobal || []);
-      toast.success(
-        t("skills.imported", { count: skills.length })
-      );
     } catch (e) {
-      console.error("Failed to import skills from clipboard", e);
-      toast.error(t("skills.importFailed", "导入失败"));
+      console.error("Failed to open global skills folder", e);
+      toast.error(t("skills.openGlobalFolderFailed", "打开全局 Skill 文件夹失败"));
     }
-  }, [importTargetProjectId, parseSkillsFromClipboardText, t]);
+  }, [t]);
 
   const handleRemoveSkillFromProject = React.useCallback(
     async (projectId: string, skill: string) => {
@@ -257,30 +293,38 @@ export default function SkillsPage() {
               </p>
             </div>
             <div className="flex gap-2 items-center">
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t("skills.searchPlaceholder", "搜索 Skills")}
+                className="w-72"
+              />
               <Select
-                value={importTargetProjectId || ""}
-                onValueChange={(v) => setImportTargetProjectId(v || null)}
-                disabled={projects.length === 0}
+                value={searchMode}
+                onValueChange={(v) =>
+                  setSearchMode((v as "name" | "content" | "all") || "name")
+                }
               >
-                <SelectTrigger className="w-72">
-                  <SelectValue placeholder={t("skills.selectProject", "选择要导入的项目")} />
+                <SelectTrigger className="w-28">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {projects.map((p) => (
-                    <SelectItem key={p.sha256} value={p.sha256}>
-                      {p.metadata?.friendly_name || p.metadata?.path || p.sha256}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="name">
+                    {t("skills.searchModeName", "名称")}
+                  </SelectItem>
+                  <SelectItem value="content">
+                    {t("skills.searchModeContent", "内容")}
+                  </SelectItem>
+                  <SelectItem value="all">{t("skills.searchModeAll", "全部")}</SelectItem>
                 </SelectContent>
               </Select>
               <Button
-                variant="secondary"
-                onClick={handleImportFromClipboard}
-                disabled={projects.length === 0 || isLoading}
+                variant="outline"
+                onClick={handleOpenGlobalSkillsFolder}
                 className="flex items-center gap-2"
               >
-                <ClipboardPaste className="h-4 w-4" />
-                {t("skills.importFromClipboard", "从剪贴板导入到项目")}
+                <FolderOpen className="h-4 w-4" />
+                {t("skills.openGlobalFolder", "打开全局 Skill 文件夹")}
               </Button>
               <Button variant="outline" onClick={refresh} disabled={isLoading}>
                 {t("common.refresh", "刷新")}
@@ -296,7 +340,7 @@ export default function SkillsPage() {
                 {t("skills.allSkills", "全部 Skills")}
               </div>
               <div className="text-sm text-muted-foreground">
-                {allSkills.length}
+                {displaySkills.length}
               </div>
             </div>
             <div className="mt-3 flex-1 min-h-0">
@@ -305,26 +349,38 @@ export default function SkillsPage() {
                   <div className="text-sm text-muted-foreground p-2">
                     {t("common.loading")}
                   </div>
-                ) : allSkills.length === 0 ? (
+                ) : isSearching ? (
+                  <div className="text-sm text-muted-foreground p-2">
+                    {t("common.loading")}
+                  </div>
+                ) : displaySkills.length === 0 ? (
                   <div className="text-sm text-muted-foreground p-2">
                     {t("skills.empty", "暂无 Skills")}
                   </div>
                 ) : (
                   <div className="flex flex-col">
-                    {allSkills.map((skill) => {
+                    {displaySkills.map((skill) => {
                       const checked = !!selected[skill];
                       const isActive = activeSkill === skill;
+                      const hit = hitIndex.get(skill);
                       return (
                         <button
                           key={skill}
                           type="button"
                           onClick={() => setActiveSkill(skill)}
                           className={cn(
-                            "w-full flex items-center gap-3 px-2 py-2 rounded-md text-left hover:bg-accent transition",
+                            "w-full flex items-start gap-3 px-2 py-2 rounded-md text-left hover:bg-accent transition",
                             isActive && "bg-accent"
                           )}
                         >
-                          <span className="flex-1 truncate">{skill}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="truncate">{skill}</div>
+                            {hit?.snippet ? (
+                              <div className="text-xs text-muted-foreground truncate">
+                                {hit.snippet}
+                              </div>
+                            ) : null}
+                          </div>
                           <Checkbox
                             checked={checked}
                             onCheckedChange={() => handleToggleSelected(skill)}
@@ -361,7 +417,7 @@ export default function SkillsPage() {
                   className="flex items-center gap-2"
                 >
                   <Copy className="h-4 w-4" />
-                  {t("common.copy")}
+                  {t("skills.copyFolders", "复制文件夹")}
                 </Button>
               </div>
             </div>

@@ -11,6 +11,7 @@ echo  Steps: Checking Frontend -^> Start Backend
 echo ==========================================
 
 set "FRONTEND_DIR=%~dp0frontend"
+set "QWENCODE_CLI_IDLE_TIMEOUT_SECONDS=172800"
 
 echo [1/2] Checking frontend build artifacts...
 if not exist "%FRONTEND_DIR%\dist\index.html" (

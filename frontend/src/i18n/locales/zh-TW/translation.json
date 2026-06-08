@@ -60,7 +60,14 @@
     "user": "使用者",
     "generating": "產生中...",
     "rawJsonButton": "原始 JSON",
+    "exportMdButton": "匯出 MD",
     "rawJsonTitle": "訊息原始 JSON",
+    "directChatTitle": "直接對話",
+    "directChatCard": {
+      "title": "直接對話",
+      "description": "使用臨時資料夾作為工作區，直接開始一次新的對話。"
+    },
+    "directChatCreateDirFailed": "建立目錄失敗",
     "projectsCard": {
       "title": "專案",
       "description": "管理您的專案，檢視過往討論。"
@@ -155,7 +162,7 @@
     "export": "複製分類",
     "exportSuccess": "已成功複製到剪貼簿",
     "exportFailed": "複製到剪貼簿失敗",
-    "saveToCurrentDir": "儲存到目前目錄",
+    "saveToCurrentDir": "儲存到C槽",
     "saveAs": "另存為",
     "exportSavedTo": "已儲存到 {{path}}",
     "exportSaveFailed": "儲存失敗",
@@ -246,7 +253,8 @@
     "logTypeOut": "輸出",
     "noLogsMessage": "尚無 CLI I/O 記錄。開始對話以查看原始通訊。",
     "continueConversation": "繼續對話",
-    "startingConversation": "對話啟動中..."
+    "startingConversation": "對話啟動中...",
+    "commonPhrases": "常用語"
   },
 
   "toolCalls": {

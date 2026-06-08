@@ -66,6 +66,10 @@ declare global {
           env_key?: string;
           use_oauth?: boolean;
           enable_thinking?: boolean;
+          temperature?: number;
+          max_tokens?: number;
+          timeout_ms?: number;
+          apply_sampling_params_globally?: boolean;
         }) => Promise<{ ok: boolean; error?: string }>;
         open_qwen_settings_in_editor: () => Promise<{ ok: boolean; error?: string }>;
         open_qwen_folder: () => Promise<{ ok: boolean; error?: string }>;
@@ -138,9 +142,28 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
               const isOAuth = authType === "qwen-oauth";
               
               if (isOAuth) {
+                const providers = settings.modelProviders?.openai || [];
+                const providerConfig = providers.find((p: any) => p.id === "coder-model");
+                const samplingParams = providerConfig?.generationConfig?.samplingParams;
+                const temperature =
+                  typeof samplingParams?.temperature === "number"
+                    ? samplingParams.temperature
+                    : undefined;
+                const maxTokens =
+                  typeof samplingParams?.max_tokens === "number"
+                    ? samplingParams.max_tokens
+                    : undefined;
+                const timeoutMs =
+                  typeof providerConfig?.generationConfig?.timeout === "number"
+                    ? providerConfig.generationConfig.timeout
+                    : undefined;
+
                 updateQwenConfig({
                   useOAuth: true,
-                  model: "coder-model"
+                  model: "coder-model",
+                  ...(temperature !== undefined ? { temperature } : {}),
+                  ...(maxTokens !== undefined ? { maxTokens } : {}),
+                  ...(timeoutMs !== undefined ? { timeoutMs } : {}),
                 });
               } else if (settings.model && settings.model.name) {
                 const providers = settings.modelProviders?.openai || [];
@@ -151,13 +174,30 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   const envKey = activeProviderConfig.envKey;
                   const apiKey = settings.env?.[envKey] || "";
                   const isThinking = activeProviderConfig.generationConfig?.extra_body?.enable_thinking === true;
+                  const samplingParams =
+                    activeProviderConfig.generationConfig?.samplingParams;
+                  const temperature =
+                    typeof samplingParams?.temperature === "number"
+                      ? samplingParams.temperature
+                      : undefined;
+                  const maxTokens =
+                    typeof samplingParams?.max_tokens === "number"
+                      ? samplingParams.max_tokens
+                      : undefined;
+                  const timeoutMs =
+                    typeof activeProviderConfig.generationConfig?.timeout === "number"
+                      ? activeProviderConfig.generationConfig.timeout
+                      : undefined;
                   
                   updateQwenConfig({
                     baseUrl: activeProviderConfig.baseUrl,
                     apiKey: apiKey,
                     model: activeProviderId,
                     useOAuth: false,
-                    enableThinking: isThinking
+                    enableThinking: isThinking,
+                    ...(temperature !== undefined ? { temperature } : {}),
+                    ...(maxTokens !== undefined ? { maxTokens } : {}),
+                    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
                   });
                 } else {
                   // Fallback if we have a model name but no specific provider match
@@ -199,7 +239,11 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
         api_key: qwenConfig.apiKey,
         env_key: envKey, // Undefined if custom, triggering backend auto-generation
         use_oauth: qwenConfig.useOAuth,
-        enable_thinking: qwenConfig.enableThinking
+        enable_thinking: qwenConfig.enableThinking,
+        temperature: qwenConfig.temperature,
+        max_tokens: qwenConfig.maxTokens,
+        timeout_ms: qwenConfig.timeoutMs,
+        apply_sampling_params_globally: true
       });
       
       if (res.ok) {
@@ -215,7 +259,12 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
 
   const testConnection = async (baseUrl: string, apiKey: string, model: string) => {
-    if (!baseUrl || !apiKey) {
+    const isOllamaBaseUrl = (u: string) => {
+      const normalized = (u || "").replace(/\/+$/, "");
+      return /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0):11434(\/|$)/.test(normalized);
+    };
+
+    if (!baseUrl || (!apiKey && !isOllamaBaseUrl(baseUrl))) {
       toast.error("Please provide both Base URL and API Key");
       return;
     }
@@ -261,9 +310,28 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
         const isOAuth = authType === "qwen-oauth";
         
         if (isOAuth) {
+          const providers = settings.modelProviders?.openai || [];
+          const providerConfig = providers.find((p: any) => p.id === "coder-model");
+          const samplingParams = providerConfig?.generationConfig?.samplingParams;
+          const temperature =
+            typeof samplingParams?.temperature === "number"
+              ? samplingParams.temperature
+              : undefined;
+          const maxTokens =
+            typeof samplingParams?.max_tokens === "number"
+              ? samplingParams.max_tokens
+              : undefined;
+          const timeoutMs =
+            typeof providerConfig?.generationConfig?.timeout === "number"
+              ? providerConfig.generationConfig.timeout
+              : undefined;
+
           updateQwenConfig({
             useOAuth: true,
-            model: "coder-model"
+            model: "coder-model",
+            ...(temperature !== undefined ? { temperature } : {}),
+            ...(maxTokens !== undefined ? { maxTokens } : {}),
+            ...(timeoutMs !== undefined ? { timeoutMs } : {}),
           });
           toast.success("Loaded: OAuth (coder-model)", { id: toastId });
         } else if (settings.model && settings.model.name) {
@@ -275,13 +343,30 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
             const envKey = activeProviderConfig.envKey;
             const apiKey = settings.env?.[envKey] || "";
             const isThinking = activeProviderConfig.generationConfig?.extra_body?.enable_thinking === true;
+            const samplingParams =
+              activeProviderConfig.generationConfig?.samplingParams;
+            const temperature =
+              typeof samplingParams?.temperature === "number"
+                ? samplingParams.temperature
+                : undefined;
+            const maxTokens =
+              typeof samplingParams?.max_tokens === "number"
+                ? samplingParams.max_tokens
+                : undefined;
+            const timeoutMs =
+              typeof activeProviderConfig.generationConfig?.timeout === "number"
+                ? activeProviderConfig.generationConfig.timeout
+                : undefined;
             
             updateQwenConfig({
               baseUrl: activeProviderConfig.baseUrl,
               apiKey: apiKey,
               model: activeProviderId,
               useOAuth: false,
-              enableThinking: isThinking
+              enableThinking: isThinking,
+              ...(temperature !== undefined ? { temperature } : {}),
+              ...(maxTokens !== undefined ? { maxTokens } : {}),
+              ...(timeoutMs !== undefined ? { timeoutMs } : {}),
             });
             toast.success(`Loaded: ${activeProviderId}`, { id: toastId });
           } else {
@@ -579,6 +664,85 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 >
                   {t("conversations.oauth")}
                 </label>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">
+                    Temperature
+                  </label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    value={qwenConfig.temperature ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "") {
+                        updateQwenConfig({ temperature: undefined });
+                        return;
+                      }
+                      const n = Number(v);
+                      if (Number.isFinite(n)) {
+                        updateQwenConfig({ temperature: n });
+                      }
+                    }}
+                    placeholder="0.5"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">
+                    Max Tokens
+                  </label>
+                  <Input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={qwenConfig.maxTokens ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "") {
+                        updateQwenConfig({ maxTokens: undefined });
+                        return;
+                      }
+                      const n = Number(v);
+                      if (Number.isFinite(n)) {
+                        updateQwenConfig({ maxTokens: Math.trunc(n) });
+                      }
+                    }}
+                    placeholder="4096"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">
+                  Request Timeout (s)
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={
+                    typeof qwenConfig.timeoutMs === "number"
+                      ? String(Math.max(1, Math.trunc(qwenConfig.timeoutMs / 1000)))
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "") {
+                      updateQwenConfig({ timeoutMs: undefined });
+                      return;
+                    }
+                    const n = Number(v);
+                    if (Number.isFinite(n)) {
+                      const seconds = Math.max(1, Math.trunc(n));
+                      updateQwenConfig({ timeoutMs: seconds * 1000 });
+                    }
+                  }}
+                  placeholder={qwenConfig.enableThinking ? "300" : "60"}
+                />
               </div>
 
               {!qwenConfig.useOAuth && (

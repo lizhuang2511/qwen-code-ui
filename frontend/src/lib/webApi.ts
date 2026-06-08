@@ -85,6 +85,18 @@ export const webApi: API = {
     await apiClient.post("/tool-confirmation", params);
   },
 
+  async create_questionnaire(params) {
+    const response = await apiClient.post("/questionnaires/create", params);
+    return response.data;
+  },
+
+  async get_pending_questionnaires(params: { sessionId: string }) {
+    const response = await apiClient.get("/questionnaires/pending", {
+      params,
+    });
+    return response.data;
+  },
+
   async execute_confirmed_command(params) {
     const response = await apiClient.post<string>("/execute-command", params);
     return response.data;
@@ -323,10 +335,9 @@ export const webApi: API = {
     return response.data;
   },
 
-  async create_directory(_params) {
-    // Web mode implementation if needed, or throw error
-    console.warn("create_directory not implemented in web mode");
-    return false;
+  async create_directory(params) {
+    const response = await apiClient.post<boolean>("/create-directory", params);
+    return response.data;
   },
 
   async delete_path(_params) {
@@ -351,6 +362,14 @@ export const webApi: API = {
       console.warn("Clipboard access failed", e);
     }
     return { type: "empty", content: null };
+  },
+
+  async resolve_skill_folders(params: { skills: string[]; projectPath?: string }) {
+    const response = await apiClient.post<string[]>("/skills/resolve-folders", {
+      skills: params.skills,
+      projectPath: params.projectPath || "",
+    });
+    return response.data;
   },
 
   async set_clipboard_content(params) {
@@ -417,6 +436,11 @@ export const webApi: API = {
     return (response.data as any).data || response.data;
   },
 
+  async create_temp_workspace() {
+    const response = await apiClient.get<string>("/create-temp-workspace");
+    return response.data;
+  },
+
   async is_home_directory(params: { path: string }) {
     const response = await apiClient.post<boolean>("/is-home-directory", params);
     return response.data;
@@ -469,6 +493,18 @@ export const webApi: API = {
     return response.data;
   },
 
+  async search_skills(params: { q: string; mode?: string; projectPath?: string; limit?: number }) {
+    const response = await apiClient.get<SkillSearchHit[]>("/skills/search", {
+      params: {
+        q: params.q,
+        mode: params.mode || "all",
+        projectPath: params.projectPath || "",
+        limit: params.limit ?? 200,
+      },
+    });
+    return response.data;
+  },
+
   async get_qwen_settings() {
     const response = await apiClient.get<any>("/qwen-settings");
     return response.data;
@@ -499,6 +535,11 @@ export const webApi: API = {
     return response.data;
   },
 
+  async open_global_skills_folder() {
+    const response = await apiClient.post<{ ok: boolean; error?: string }>("/open-global-skills-folder");
+    return response.data;
+  },
+
   async open_model_providers_json() {
     const response = await apiClient.post<{ ok: boolean; error?: string }>("/open-model-providers-json");
     return response.data;
@@ -520,6 +561,13 @@ export interface RecentChat {
   title: string;
   started_at_iso: string;
   message_count: number;
+}
+
+export interface SkillSearchHit {
+  skill: string;
+  matchedIn: "name" | "content" | "all";
+  path?: string;
+  snippet?: string;
 }
 
 export interface ConversationHistoryEntry {

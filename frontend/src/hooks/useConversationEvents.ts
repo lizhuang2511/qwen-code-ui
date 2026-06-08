@@ -927,6 +927,8 @@ export const useConversationEvents = (
         );
         unlistenFunctions.push(unlistenAcpPermissionRequest);
 
+        
+
         // Listen for turn finished events to stop streaming indicator
         const unlistenAiTurnFinished = await listen<boolean>(
           `ai-turn-finished-${sanitizedId}`,
@@ -972,7 +974,8 @@ export const useConversationEvents = (
         );
         unlistenFunctions.push(unlistenAiTurnFinished);
 
-        // Add a small delay to ensure listeners are fully active
+        
+
         await new Promise((resolve) => setTimeout(resolve, 100));
         // TODO 8/17/2025: Look in to the hard-coded delaay.
       } catch (error) {

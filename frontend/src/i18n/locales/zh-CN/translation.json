@@ -62,7 +62,14 @@
     "user": "用户",
     "generating": "生成中...",
     "rawJsonButton": "原始 JSON",
+    "exportMdButton": "导出 MD",
     "rawJsonTitle": "消息原始 JSON",
+    "directChatTitle": "直接对话",
+    "directChatCard": {
+      "title": "直接对话",
+      "description": "使用临时文件夹作为工作区，直接开始一次新的对话。"
+    },
+    "directChatCreateDirFailed": "创建目录失败",
     "projectsCard": {
       "title": "项目",
       "description": "管理您的项目，查看过往讨论。"
@@ -200,7 +207,7 @@
     "export": "复制分类",
     "exportSuccess": "复制到剪贴板成功",
     "exportFailed": "复制到剪贴板失败",
-    "saveToCurrentDir": "保存到当前目录",
+    "saveToCurrentDir": "保存到C盘",
     "saveAs": "另存为",
     "exportSavedTo": "已保存到 {{path}}",
     "exportSaveFailed": "保存失败",
@@ -291,7 +298,8 @@
     "logTypeOut": "输出",
     "noLogsMessage": "尚无 CLI I/O 日志。开始对话以查看原始通信。",
     "continueConversation": "继续对话",
-    "startingConversation": "对话启动中..."
+    "startingConversation": "对话启动中...",
+    "commonPhrases": "常用语"
   },
 
   "toolCalls": {

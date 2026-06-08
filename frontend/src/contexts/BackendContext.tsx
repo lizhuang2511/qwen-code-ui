@@ -200,11 +200,15 @@ export const BackendProvider: React.FC<BackendProviderProps> = ({
               const providers = settings.modelProviders?.openai || [];
               const providerConfig = providers.find((p: any) => p.id === "coder-model");
               const isThinking = providerConfig?.generationConfig?.extra_body?.enable_thinking === true;
+              const samplingParams = providerConfig?.generationConfig?.samplingParams;
+              const temperature = typeof samplingParams?.temperature === "number" ? samplingParams.temperature : undefined;
+              const maxTokens = typeof samplingParams?.max_tokens === "number" ? samplingParams.max_tokens : undefined;
+              const timeoutMs = typeof providerConfig?.generationConfig?.timeout === "number" ? providerConfig.generationConfig.timeout : undefined;
 
               dispatch({
                 type: "UPDATE_CONFIG",
                 backend: "qwen",
-                config: { useOAuth: true, model: "coder-model", enableThinking: isThinking }
+                config: { useOAuth: true, model: "coder-model", enableThinking: isThinking, ...(temperature !== undefined ? { temperature } : {}), ...(maxTokens !== undefined ? { maxTokens } : {}), ...(timeoutMs !== undefined ? { timeoutMs } : {}) }
               });
             } else if (currentModelName) {
               // Custom model
@@ -217,6 +221,10 @@ export const BackendProvider: React.FC<BackendProviderProps> = ({
                 // Try to get from settings.env first, but don't overwrite if we already have it in localStorage and it's missing here
                 const apiKey = settings.env?.[envKey] || "";
                 const isThinking = providerConfig.generationConfig?.extra_body?.enable_thinking === true;
+                const samplingParams = providerConfig?.generationConfig?.samplingParams;
+                const temperature = typeof samplingParams?.temperature === "number" ? samplingParams.temperature : undefined;
+                const maxTokens = typeof samplingParams?.max_tokens === "number" ? samplingParams.max_tokens : undefined;
+                const timeoutMs = typeof providerConfig?.generationConfig?.timeout === "number" ? providerConfig.generationConfig.timeout : undefined;
                 
                 dispatch({
                   type: "UPDATE_CONFIG",
@@ -226,7 +234,10 @@ export const BackendProvider: React.FC<BackendProviderProps> = ({
                     model: currentModelName,
                     baseUrl: providerConfig.baseUrl,
                     ...(apiKey ? { apiKey } : {}), // Only update apiKey if found
-                    enableThinking: isThinking
+                    enableThinking: isThinking,
+                    ...(temperature !== undefined ? { temperature } : {}),
+                    ...(maxTokens !== undefined ? { maxTokens } : {}),
+                    ...(timeoutMs !== undefined ? { timeoutMs } : {})
                   }
                 });
               } else {

@@ -51,6 +51,43 @@ export interface ToolCallConfirmationContent {
   newText?: string;
 }
 
+export interface QuestionnaireOption {
+  id: string;
+  label: string;
+}
+
+export type QuestionnaireQuestion =
+  | {
+      id: string;
+      type: "single";
+      label: string;
+      required?: boolean;
+      options: QuestionnaireOption[];
+    }
+  | {
+      id: string;
+      type: "multi";
+      label: string;
+      required?: boolean;
+      options: QuestionnaireOption[];
+    }
+  | {
+      id: string;
+      type: "text";
+      label: string;
+      required?: boolean;
+      multiline?: boolean;
+      placeholder?: string;
+    };
+
+export type QuestionnaireAnswers = Record<string, string | string[]>;
+
+export interface QuestionnairePayload {
+  title: string;
+  questions: QuestionnaireQuestion[];
+  draftAnswers?: QuestionnaireAnswers;
+}
+
 export interface ToolCallConfirmationRequest {
   requestId: number;
   sessionId: string;
@@ -59,7 +96,7 @@ export interface ToolCallConfirmationRequest {
   icon: string;
   content: ToolCallConfirmationContent;
   confirmation: {
-    type: "edit" | "command" | "generic";
+    type: "edit" | "command" | "generic" | "questionnaire";
     rootCommand?: string;
     command?: string;
   };
@@ -71,6 +108,7 @@ export interface ToolCallConfirmationRequest {
     name: string;
     kind: "allow_once" | "allow_always" | "reject_once" | "reject_always";
   }>;
+  questionnaire?: QuestionnairePayload;
 }
 
 export interface ToolCall {

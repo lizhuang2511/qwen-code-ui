@@ -62,7 +62,14 @@
     "user": "User",
     "generating": "Generating...",
     "rawJsonButton": "Raw JSON",
+    "exportMdButton": "Export MD",
     "rawJsonTitle": "Message Raw JSON",
+    "directChatTitle": "Direct Chat",
+    "directChatCard": {
+      "title": "Direct Chat",
+      "description": "Start a new conversation using a temporary folder as the workspace."
+    },
+    "directChatCreateDirFailed": "Failed to create directory",
     "projectsCard": {
       "title": "Projects",
       "description": "Manage your projects, view past discussions."
@@ -161,7 +168,7 @@
     "export": "Copy Categories",
     "exportSuccess": "Copied to clipboard successfully",
     "exportFailed": "Failed to copy to clipboard",
-    "saveToCurrentDir": "Save to current folder",
+    "saveToCurrentDir": "Save to C drive",
     "saveAs": "Save As",
     "exportSavedTo": "Saved to {{path}}",
     "exportSaveFailed": "Failed to save",
@@ -253,7 +260,8 @@
     "logTypeOut": "OUT",
     "noLogsMessage": "No CLI logs for this session yet.",
     "continueConversation": "Continue this conversation",
-    "startingConversation": "Starting conversation..."
+    "startingConversation": "Starting conversation...",
+    "commonPhrases": "Common phrases"
   },
 
   "toolCalls": {

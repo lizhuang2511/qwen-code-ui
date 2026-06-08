@@ -24,12 +24,14 @@ import {
   CardTitle,
   CardDescription,
 } from "../components/ui/card";
-import { Info, UserRound, FolderKanban, FileText, Sparkles, Download, Loader2 } from "lucide-react";
+import { Info, UserRound, FolderKanban, FileText, Sparkles, Download, Loader2, MessageSquare } from "lucide-react";
 import { ModelContextProtocol } from "../components/common/ModelContextProtocol";
 import { getBackendText } from "../utils/backendText";
 import { useBackend } from "../contexts/BackendContext";
-import { GeminiMessagePart } from "../types";
+import { GeminiMessagePart, type Message } from "../types";
 import { api } from "../lib/api";
+import { downloadMarkdownContent } from "../utils/download";
+import { toast } from "sonner";
 
 export const HomeDashboard: React.FC = () => {
   const { t } = useTranslation();
@@ -39,6 +41,7 @@ export const HomeDashboard: React.FC = () => {
     messagesContainerRef,
     handleConfirmToolCall,
     confirmationRequests,
+    startNewConversation,
   } = useConversation();
 
   // Debug logging for currentConversation
@@ -59,6 +62,185 @@ export const HomeDashboard: React.FC = () => {
   >("idle");
   const [pythonOutput, setPythonOutput] = React.useState<string>("");
 
+  const [exportingMessageId, setExportingMessageId] = React.useState<
+    string | null
+  >(null);
+  const [exportChoiceOpen, setExportChoiceOpen] = React.useState(false);
+  const [pendingExportMessage, setPendingExportMessage] = React.useState<Message | null>(null);
+  const [isStartingDirectChat, setIsStartingDirectChat] = React.useState(false);
+
+  const handleStartDirectChat = React.useCallback(async () => {
+    if (isStartingDirectChat) return;
+    setIsStartingDirectChat(true);
+    try {
+      const baseDir = "d:/qwencode/临时计算";
+      const exists = await api.validate_directory({ path: baseDir });
+      if (!exists) {
+        const ok = confirm(`目录不存在：${baseDir}\n是否新建？`);
+        if (!ok) return;
+        const created = await api.create_directory({ path: baseDir });
+        if (!created) {
+          toast.error(t("dashboard.directChatCreateDirFailed", "创建目录失败"));
+          return;
+        }
+      }
+      const wd = await api.create_temp_workspace();
+      const title = t("dashboard.directChatTitle", "直接对话");
+      await startNewConversation(title, wd);
+    } finally {
+      setIsStartingDirectChat(false);
+    }
+  }, [isStartingDirectChat, startNewConversation, t]);
+
+  const joinPath = React.useCallback((dir: string, fileName: string) => {
+    const normalized = (dir || "").replace(/[\\/]+$/, "");
+    const sep = normalized.includes("\\") ? "\\" : "/";
+    if (!normalized) return fileName;
+    return `${normalized}${sep}${fileName}`;
+  }, []);
+
+  const buildMessageMarkdown = React.useCallback(
+    (message: Message, mode: "all" | "last" = "all"): string => {
+    const getFence = (content: string) => {
+      const matches = content.match(/`+/g) || [];
+      const maxRun = matches.reduce((m, s) => Math.max(m, s.length), 0);
+      return "`".repeat(Math.max(3, maxRun + 1));
+    };
+
+    const codeBlock = (content: string, lang?: string) => {
+      const c = content ?? "";
+      const fence = getFence(c);
+      const language = lang ? lang.trim() : "";
+      return `${fence}${language}\n${c}\n${fence}`;
+    };
+
+    const asText = (value: unknown) => {
+      if (typeof value === "string") return value;
+      try {
+        return JSON.stringify(value, null, 2);
+      } catch {
+        return String(value);
+      }
+    };
+
+    if (message.sender === "user") {
+      return "";
+    }
+
+    if (mode === "last") {
+      const out: string[] = [];
+      for (const part of message.parts) {
+        if (part.type === "text") {
+          const text = part.text.trimEnd();
+          if (text.trim()) out.push(text);
+        }
+      }
+      return `${out.join("\n\n").trim()}\n`;
+    }
+
+    const groupedParts = message.parts.reduce<GeminiMessagePart[]>(
+      (acc, part) => {
+        const lastPart = acc.length > 0 ? acc[acc.length - 1] : null;
+        if (part.type === "thinking" && lastPart?.type === "thinking") {
+          lastPart.thinking += `\n\n${part.thinking}`;
+        } else {
+          acc.push({ ...part });
+        }
+        return acc;
+      },
+      []
+    );
+
+    const out: string[] = [];
+    for (const part of groupedParts) {
+      if (part.type === "text") {
+        if (part.text.trim()) out.push(part.text.trimEnd());
+      } else if (part.type === "thinking") {
+        const t = part.thinking.trimEnd();
+        if (t) {
+          out.push("## Thinking");
+          out.push(codeBlock(t, "text"));
+        }
+      } else if (part.type === "toolCall") {
+        const toolCall = part.toolCall;
+        out.push(`## ToolCall: ${toolCall.name}`);
+        if (toolCall.status) out.push(`Status: ${toolCall.status}`);
+        if (toolCall.inputJsonRpc) {
+          out.push("### Input (JSON-RPC)");
+          out.push(codeBlock(toolCall.inputJsonRpc.trimEnd(), "json"));
+        }
+        if (toolCall.outputJsonRpc) {
+          out.push("### Output (JSON-RPC)");
+          out.push(codeBlock(toolCall.outputJsonRpc.trimEnd(), "json"));
+        }
+        if (toolCall.result !== undefined) {
+          const result = toolCall.result;
+          if (
+            typeof result === "object" &&
+            result !== null &&
+            "markdown" in result &&
+            typeof (result as { markdown?: unknown }).markdown === "string" &&
+            (result as { markdown: string }).markdown.trim()
+          ) {
+            out.push("### Result (Markdown)");
+            out.push((result as { markdown: string }).markdown.trimEnd());
+          } else {
+            out.push("### Result");
+            out.push(codeBlock(asText(result).trimEnd(), "json"));
+          }
+        }
+      }
+    }
+
+    return `${out.join("\n\n").trim()}\n`;
+    },
+    []
+  );
+
+  const exportMd = React.useCallback(
+    async (message: Message, mode: "all" | "last") => {
+      if (message.sender !== "assistant") return;
+      const timestamp = message.timestamp instanceof Date ? message.timestamp : new Date();
+      const pad2 = (n: number) => String(n).padStart(2, "0");
+      const fileName = `reply-${timestamp.getFullYear()}-${pad2(
+        timestamp.getMonth() + 1
+      )}-${pad2(timestamp.getDate())}-${pad2(timestamp.getHours())}-${pad2(
+        timestamp.getMinutes()
+      )}-${pad2(timestamp.getSeconds())}.md`;
+
+      const content = buildMessageMarkdown(message, mode);
+      if (!content.trim()) return;
+
+      setExportingMessageId(message.id);
+      try {
+        const wd = currentConversation?.workingDirectory;
+        if (wd) {
+          const targetPath = joinPath(wd, fileName);
+          await api.write_file_content({ path: targetPath, content });
+          return;
+        }
+
+        const selectedPath = await api.select_save_file({
+          sessionId: currentConversation?.id,
+          defaultFilename: fileName,
+        });
+        if (!selectedPath) return;
+        await api.write_file_content({ path: selectedPath, content });
+      } catch {
+        downloadMarkdownContent(content, fileName);
+      } finally {
+        setExportingMessageId((prev) => (prev === message.id ? null : prev));
+      }
+    },
+    [buildMessageMarkdown, currentConversation?.id, currentConversation?.workingDirectory, joinPath]
+  );
+
+  const handleExportMd = React.useCallback((message: Message) => {
+    if (message.sender !== "assistant") return;
+    setPendingExportMessage(message);
+    setExportChoiceOpen(true);
+  }, []);
+
   const startQwenInstallFlow = React.useCallback(async () => {
     setQwenDialogOpen(true);
     setQwenOutput("");
@@ -73,7 +255,7 @@ export const HomeDashboard: React.FC = () => {
       const res = await api.install_qwen();
       setQwenOutput(res.output || "");
       setQwenStatus(res.installed ? "installed" : "failed");
-    } catch (e) {
+    } catch {
       setQwenStatus("failed");
     }
   }, []);
@@ -94,7 +276,7 @@ export const HomeDashboard: React.FC = () => {
       const res = await api.install_python();
       setPythonOutput(res.output || "");
       setPythonStatus(res.installed ? "installed" : "failed");
-    } catch (e) {
+    } catch {
       setPythonStatus("failed");
     }
   }, []);
@@ -128,6 +310,51 @@ export const HomeDashboard: React.FC = () => {
 
   return (
     <>
+      <Dialog
+        open={exportChoiceOpen}
+        onOpenChange={(open) => {
+          setExportChoiceOpen(open);
+          if (!open) setPendingExportMessage(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>导出 Markdown</DialogTitle>
+            <DialogDescription>选择导出内容范围</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            <Button
+              onClick={async () => {
+                const msg = pendingExportMessage;
+                setExportChoiceOpen(false);
+                if (!msg) return;
+                await exportMd(msg, "all");
+              }}
+            >
+              导出所有内容（含工具调用）
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={async () => {
+                const msg = pendingExportMessage;
+                setExportChoiceOpen(false);
+                if (!msg) return;
+                await exportMd(msg, "last");
+              }}
+            >
+              仅导出最后回复内容
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setExportChoiceOpen(false);
+              }}
+            >
+              取消
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {currentConversation ? (
         currentConversation.messages.length === 0 ? (
           <NewChatPlaceholder />
@@ -286,7 +513,7 @@ ${part.thinking}`;
                     </>
 
                     {/* Info button for raw JSON */}
-                    <div className="mt-2 flex justify-start">
+                    <div className="mt-2 flex justify-start gap-1">
                       <Dialog>
                         <DialogTrigger asChild>
                           <Button
@@ -314,6 +541,23 @@ ${part.thinking}`;
                           </div>
                         </DialogContent>
                       </Dialog>
+
+                      {message.sender === "assistant" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                          disabled={exportingMessageId === message.id}
+                          onClick={() => handleExportMd(message)}
+                        >
+                          {exportingMessageId === message.id ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : (
+                            <Download className="h-3 w-3 mr-1" />
+                          )}
+                          {t("dashboard.exportMdButton")}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -352,9 +596,34 @@ ${part.thinking}`;
 
           <p className="text-muted-foreground mb-6">{backendText.tagline}</p>
 
-          <div className="w-full max-w-3xl flex justify-center">
+          <div className="w-full max-w-3xl grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card
-              className="cursor-pointer transition-colors hover:bg-accent w-full max-w-xl"
+              className={`cursor-pointer transition-colors hover:bg-accent w-full ${isStartingDirectChat ? "opacity-60 pointer-events-none" : ""}`}
+              onClick={handleStartDirectChat}
+            >
+              <CardHeader className="flex flex-row items-center gap-3">
+                <div className="shrink-0 h-6 w-6 flex items-center justify-center">
+                  {isStartingDirectChat ? (
+                    <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
+                  ) : (
+                    <MessageSquare className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="text-left">
+                  <CardTitle className="text-base">
+                    {t("dashboard.directChatCard.title", "直接对话")}
+                  </CardTitle>
+                  <CardDescription>
+                    {t(
+                      "dashboard.directChatCard.description",
+                      "使用临时文件夹作为工作区，直接开始一次新的对话。"
+                    )}
+                  </CardDescription>
+                </div>
+              </CardHeader>
+            </Card>
+            <Card
+              className="cursor-pointer transition-colors hover:bg-accent w-full"
               onClick={() => navigate("/projects")}
             >
               <CardHeader className="flex flex-row items-center gap-3">

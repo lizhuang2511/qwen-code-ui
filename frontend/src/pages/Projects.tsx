@@ -62,11 +62,21 @@ export default function ProjectsPage() {
   const { selectedBackend } = useBackend();
   const backendText = getBackendText(selectedBackend);
 
+  const defaultSaveDir = "C:\\Users\\24601";
+  const defaultSavePath = "C:\\Users\\24601\\分类列表.txt";
+
   const joinPath = React.useCallback((dir: string, fileName: string) => {
     const normalized = (dir || "").replace(/[\\/]+$/, "");
     const sep = normalized.includes("\\") ? "\\" : "/";
     if (!normalized) return fileName;
     return `${normalized}${sep}${fileName}`;
+  }, []);
+
+  const getDirname = React.useCallback((p: string) => {
+    const normalized = (p || "").replace(/[\\/]+$/, "");
+    const idx = Math.max(normalized.lastIndexOf("\\"), normalized.lastIndexOf("/"));
+    if (idx < 0) return "";
+    return normalized.slice(0, idx);
   }, []);
 
   const downloadTextFile = React.useCallback((content: string, fileName: string) => {
@@ -82,52 +92,114 @@ export default function ProjectsPage() {
     URL.revokeObjectURL(url);
   }, []);
 
+  const buildSaveContent = React.useCallback(
+    async (targetPath: string) => {
+      let skills: string[] = [];
+      try {
+        skills = await api.get_skills();
+      } catch {
+        skills = [];
+      }
+
+      const skillInfo = await Promise.all(
+        skills.map(async (skill) => {
+          try {
+            const r = await api.get_skill_content({ skill });
+            const path = r?.path || "";
+            return { skill, path, dir: getDirname(path) };
+          } catch {
+            return { skill, path: "", dir: "" };
+          }
+        })
+      );
+
+      let mcpConfig: any = null;
+      try {
+        mcpConfig = await api.get_mcp_config();
+      } catch {
+        mcpConfig = null;
+      }
+
+      let content = "";
+      content += "【项目列表】\n";
+      content += `${exportContent.trimEnd()}\n\n`;
+      content += "【保存信息】\n";
+      content += `- 保存目标: ${targetPath}\n`;
+      content += `- 工作目录: ${workingDirectory}\n`;
+      content += "\n";
+
+      content += "【Skills 列表】\n";
+      if (skillInfo.length === 0) {
+        content += "- (空)\n";
+      } else {
+        skillInfo.forEach((it) => {
+          const folder = it.dir || it.path || "";
+          content += `- ${it.skill}${folder ? ` | ${folder}` : ""}\n`;
+        });
+      }
+      content += "\n";
+
+      content += "【MCP 配置】\n";
+      if (mcpConfig) {
+        content += `${JSON.stringify(mcpConfig, null, 2)}\n`;
+      } else {
+        content += "(空)\n";
+      }
+
+      return content;
+    },
+    [exportContent, getDirname, workingDirectory]
+  );
+
   const saveExportToPath = React.useCallback(
-    async (path: string) => {
-      await api.write_file_content({ path, content: exportContent });
+    async (path: string, content: string) => {
+      await api.write_file_content({ path, content });
       toast.success(t("projects.exportSavedTo", { path }));
     },
-    [exportContent, t]
+    [t]
   );
 
   const handleSaveExportToCurrentDir = React.useCallback(async () => {
-    const fileName = t("projects.exportDefaultFileName", "分类列表.txt");
-    const targetPath = joinPath(workingDirectory, fileName);
+    const targetPath = defaultSavePath;
     try {
       setIsSavingExport(true);
-      await saveExportToPath(targetPath);
+      const content = await buildSaveContent(targetPath);
+      await saveExportToPath(targetPath, content);
     } catch (e) {
       console.error("Failed to save export to current directory", e);
       toast.error(t("projects.exportSaveFailed", "保存失败"));
     } finally {
       setIsSavingExport(false);
     }
-  }, [joinPath, saveExportToPath, t, workingDirectory]);
+  }, [buildSaveContent, defaultSavePath, saveExportToPath, t]);
 
   const handleSaveExportAs = React.useCallback(async () => {
     const fileName = t("projects.exportDefaultFileName", "分类列表.txt");
     try {
       setIsSavingExport(true);
       const selectedPath = await api.select_save_file({
-        directory: workingDirectory,
+        directory: defaultSaveDir,
         defaultFilename: fileName,
       });
       if (selectedPath) {
-        await saveExportToPath(selectedPath);
+        const content = await buildSaveContent(selectedPath);
+        await saveExportToPath(selectedPath, content);
         return;
       }
-      downloadTextFile(exportContent, fileName);
+      const content = await buildSaveContent(joinPath(defaultSaveDir, fileName));
+      downloadTextFile(content, fileName);
     } catch (e) {
       console.error("Failed to save export as", e);
       try {
-        downloadTextFile(exportContent, fileName);
+        const content = await buildSaveContent(joinPath(defaultSaveDir, fileName));
+        downloadTextFile(content, fileName);
       } catch {
         toast.error(t("projects.exportSaveFailed", "保存失败"));
       }
     } finally {
       setIsSavingExport(false);
     }
-  }, [downloadTextFile, exportContent, saveExportToPath, t, workingDirectory]);
+  }, [buildSaveContent, defaultSaveDir, downloadTextFile, joinPath, saveExportToPath, t]);
 
   const refreshProjects = React.useCallback(async () => {
     try {

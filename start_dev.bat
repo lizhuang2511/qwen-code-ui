@@ -11,6 +11,7 @@ echo  Steps: Build Frontend -> Start Backend
 echo ==========================================
 
 set "FRONTEND_DIR=%~dp0frontend"
+set "QWENCODE_CLI_IDLE_TIMEOUT_SECONDS=172800"
 
 if not exist "%FRONTEND_DIR%\package.json" (
   echo [Error] "%FRONTEND_DIR%\package.json" not found.

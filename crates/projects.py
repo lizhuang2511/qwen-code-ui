@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Any
 from pathlib import Path
 import json
 import hashlib
@@ -87,6 +87,15 @@ def _global_qwen_skill_dirs() -> List[Path]:
         *candidates,
     ]
 
+def get_preferred_global_skills_dir() -> str:
+    for d in _global_qwen_skill_dirs():
+        try:
+            if d.exists() and d.is_dir():
+                return str(d)
+        except Exception:
+            continue
+    return str(Path.home() / ".qwen" / "skills")
+
 def _discover_project_skills(project_path: str) -> List[str]:
     p = _normalize_skill_name(project_path)
     if not p:
@@ -161,6 +170,133 @@ def get_skill_content(skill: str, project_path: str = "") -> Dict[str, str]:
                 return hit
 
     return {"path": "", "content": ""}
+
+def get_skill_folder(skill: str, project_path: str = "") -> str:
+    _ensure_data_dir()
+    s = _normalize_skill_name(skill)
+    if not s:
+        return ""
+
+    proj_path = _normalize_skill_name(project_path)
+    if proj_path:
+        root = Path(proj_path)
+        for d in _project_skill_dirs(root):
+            folder = d / s
+            if folder.exists() and folder.is_dir():
+                return str(folder)
+
+    for d in _global_qwen_skill_dirs():
+        folder = d / s
+        if folder.exists() and folder.is_dir():
+            return str(folder)
+
+    projects_raw = _read_projects()
+    for it in projects_raw.get("items", []):
+        p = _normalize_skill_name(it.get("path", ""))
+        if not p:
+            continue
+        root = Path(p)
+        for d in _project_skill_dirs(root):
+            folder = d / s
+            if folder.exists() and folder.is_dir():
+                return str(folder)
+
+    return ""
+
+def resolve_skill_folders(skills: List[str], project_path: str = "") -> List[str]:
+    out: List[str] = []
+    seen = set()
+    for s in skills or []:
+        name = _normalize_skill_name(s)
+        if not name:
+            continue
+        folder = get_skill_folder(name, project_path)
+        if not folder:
+            continue
+        if folder in seen:
+            continue
+        seen.add(folder)
+        out.append(folder)
+    return out
+
+def _make_snippet(content: str, pos: int, q_len: int, window: int = 120) -> str:
+    try:
+        if pos < 0:
+            return ""
+        half = max(0, window // 2)
+        start = max(0, pos - half)
+        end = min(len(content), pos + q_len + half)
+        snippet = content[start:end].strip()
+        if start > 0:
+            snippet = "..." + snippet
+        if end < len(content):
+            snippet = snippet + "..."
+        return snippet
+    except Exception:
+        return ""
+
+def search_skills(query: str, mode: str = "all", project_path: str = "", limit: int = 200) -> List[Dict[str, Any]]:
+    _ensure_data_dir()
+    q = _normalize_skill_name(query)
+    if not q:
+        return []
+
+    m = (mode or "all").strip().lower()
+    if m not in ("name", "content", "all"):
+        m = "all"
+
+    try:
+        limit_n = int(limit)
+    except Exception:
+        limit_n = 200
+    if limit_n <= 0:
+        limit_n = 200
+
+    q_fold = q.casefold()
+    proj_path = _normalize_skill_name(project_path)
+
+    out: List[Dict[str, Any]] = []
+    index: Dict[str, int] = {}
+
+    for s in get_all_skills():
+        s_norm = _normalize_skill_name(s)
+        if not s_norm:
+            continue
+        if len(out) >= limit_n:
+            break
+
+        name_hit = (m in ("name", "all")) and (q_fold in s_norm.casefold())
+        if name_hit:
+            out.append({"skill": s_norm, "matchedIn": "name"})
+            index[s_norm] = len(out) - 1
+            if m == "name":
+                continue
+
+        if m in ("content", "all"):
+            doc = get_skill_content(s_norm, proj_path)
+            content = doc.get("content", "") or ""
+            if not content:
+                continue
+            pos = content.casefold().find(q_fold)
+            if pos < 0:
+                continue
+            snippet = _make_snippet(content, pos, len(q))
+            item: Dict[str, Any] = {"skill": s_norm, "matchedIn": "content"}
+            if doc.get("path"):
+                item["path"] = doc.get("path", "")
+            if snippet:
+                item["snippet"] = snippet
+
+            if s_norm in index:
+                i = index[s_norm]
+                merged = {**out[i], **item}
+                merged["matchedIn"] = "all"
+                out[i] = merged
+            else:
+                out.append(item)
+                index[s_norm] = len(out) - 1
+
+    return out
 
 def hash_path(path: str) -> str:
     abs_path = os.path.abspath(path)
