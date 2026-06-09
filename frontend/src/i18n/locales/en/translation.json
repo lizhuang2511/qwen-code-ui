@@ -610,6 +610,7 @@
   "directoryPanel": {
     "title": "Directory",
     "noContent": "No directory content",
+    "view": "Read",
     "openInFileManager": "Open in File Manager",
     "openWithDefault": "Open with Default App",
     "openWithThonny": "Open with Thonny"

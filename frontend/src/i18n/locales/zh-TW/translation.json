@@ -598,6 +598,7 @@
   "directoryPanel": {
     "title": "目錄",
     "noContent": "無目錄內容",
+    "view": "閱讀",
     "openWithDefault": "用系統預設應用開啟",
     "openWithThonny": "用 Thonny 開啟"
   },

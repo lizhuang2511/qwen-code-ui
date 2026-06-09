@@ -725,7 +725,7 @@ export function DirectoryPanel({
                   title={
                     node.is_directory
                       ? node.name
-                      : `${node.name} (Ctrl+Click to view content)`
+                      : `${node.name} (Right click to read, Ctrl+Click to view content)`
                   }
                 >
                   {node.name}
@@ -733,22 +733,6 @@ export function DirectoryPanel({
 
                 {/* Action buttons */}
                 <div className="ml-auto flex items-center gap-1">
-                  {/* Eye icon for files on hover */}
-                  {!node.is_directory && (
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setViewingFile(node.full_path);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-muted rounded-md text-muted-foreground hover:text-foreground"
-                        title="View file content"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                    </>
-                  )}
-
                   {/* Plus button for folders on hover */}
                   {node.is_directory && onMentionInsert && (
                     <>
@@ -791,6 +775,19 @@ export function DirectoryPanel({
                   >
                     <FolderPlus className="mr-2 h-4 w-4" />
                     {t("directoryPanel.newFolder", "New Folder")}
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                </>
+              )}
+              {!node.is_directory && (
+                <>
+                  <ContextMenuItem
+                    onClick={() => {
+                      setViewingFile(node.full_path);
+                    }}
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    {t("directoryPanel.view", "Read")}
                   </ContextMenuItem>
                   <ContextMenuSeparator />
                 </>
